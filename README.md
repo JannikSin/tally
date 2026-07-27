@@ -10,7 +10,7 @@ Eight games, each with its own purpose-built scoring surface:
 - **Oh Hell** — auto round sequence, bid and trick phases with dealer-hook warning, two scoring presets
 - **Gin Rummy** — knock / gin / big gin / undercut, boxes, game bonus, shutout doubling
 - **Bridge** — full rubber scoring on the classic above/below-the-line pad: vulnerability, doubles, slams, honors, rubber bonuses
-- **rook** — partnership bidding 70–120, made-or-set ledger to 300 or 500
+- **Rook** — partnership bidding 70–120, made-or-set ledger to 300 or 500
 - **Mahjong** — variant-agnostic settling with East rotation
 
 No build step: vanilla [Preact](https://preactjs.com) + [htm](https://github.com/developit/htm), vendored.

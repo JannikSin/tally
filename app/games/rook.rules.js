@@ -6,8 +6,8 @@
 
 export const meta = {
   id: "rook",
-  name: "rook",
-  glyph: "🐦‍⬛",
+  name: "Rook",
+  glyph: "♜",
   hint: "Bid it, make it, or eat the set.",
 };
 

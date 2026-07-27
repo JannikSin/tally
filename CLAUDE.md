@@ -16,7 +16,7 @@ Static PWA, no build step, vanilla Preact + htm vendored. Deployed to GitHub Pag
   ever.
 - **`vendor/` upgrade ritual**: update file, update `vendor/VERSIONS.md`, bump `CACHE` in
   `sw.js` — all three or none.
-- No trademark branding: "rook" appears only as a lowercase generic game label, no bird
+- No trademark branding: "Rook" is a plain generic game label (chess-rook glyph), no bird
   imagery.
 
 ## Architecture
