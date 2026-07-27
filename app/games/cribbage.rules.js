@@ -14,17 +14,12 @@ export function init(config) {
     players: config.players,
     scores: Array(n).fill(0),
     back: Array(n).fill(0),
-    dealer: 0,
     over: false,
     winner: null,
   };
 }
 
 export function reduce(state, action) {
-  if (action.type === "deal") {
-    const dealer = (state.dealer + 1) % state.players.length;
-    return { state: { ...state, dealer }, line: null };
-  }
   if (action.type !== "peg" || state.over) return { state, line: null };
   const { player, pts } = action;
   const scores = state.scores.slice();

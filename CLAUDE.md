@@ -20,15 +20,35 @@ Static PWA, no build step, vanilla Preact + htm vendored. Deployed to GitHub Pag
   imagery.
 
 ## Architecture
-- `app/main.js` — hash router: home grid ↔ per-game screens.
-- `app/store.js` — versioned action-log sessions in localStorage (`tally.v1`). Undo = pop
-  action, state = pure replay. Corrupt/unknown logs are quarantined to `tally.v1.corrupt`
-  and the app boots clean; never throw at boot.
-- `app/games/<game>.js` — one module per game: `{ meta, Setup, Play }` UI + pure
-  `reduce(state, action)` scoring. Scoring logic stays dependency-free so `node --test`
-  can import it without a DOM.
-- `tests/` — `node --test tests/` covers every scoring function.
+- `app/main.js` — hash router: home grid ↔ per-game screens. Shell owns the top bar,
+  undo, and end-game; games render only their entry surface and score display.
+- `app/store.js` — versioned localStorage store (`tally.v1`). Persists STATE, not an
+  action log: each session holds `{config, state, log[], undo[]}` where `undo` is a
+  bounded snapshot stack (see `UNDO_CAP`) and `log` is display-only lines. Corrupt or
+  unknown-schema data is quarantined to `tally.v1.corrupt` and the app boots clean;
+  never throw at boot. Restore stashes the outgoing db to `tally.v1.prev`.
+- `app/games/<game>.rules.js` — pure scoring: `meta`, `init(config)`,
+  `reduce(state, action) -> {state, line}`, `summary(state) -> {done, line}`.
+  ZERO imports — may never import htm/preact; `tests/rules.test.mjs` enforces this.
+- `app/games/<game>.js` — the UI: imports its rules module, re-exports
+  `meta`/`rules`, exports `Setup` and `Play` components.
+- `app/ui.js` — the only shared-widget file (Seg, Stepper, PlayerNames, ScoreBar,
+  LogList, OverBanner).
+- `tests/rules.test.mjs` — every scoring function + contract/purity/CSP checks.
+
+## Adding a game
+Three touch points, all manual:
+1. `app/games/<name>.rules.js` + `app/games/<name>.js` — clone the closest template:
+   euchre/rook/bridge for two-team target games, ohhell/sheepshead/mahjong for N-player
+   running-tally games, gin/cribbage for 2-3 player races.
+2. `app/main.js` — import it and add to the `GAMES` array (this puts it on the home grid).
+3. `sw.js` — add BOTH files to `PRECACHE` and bump `CACHE`, or the game silently breaks
+   offline for installed users. Nothing derives that list automatically.
+Then add rules tests to `tests/rules.test.mjs` (the contract test picks up the new
+`.rules.js` file automatically and will fail until `meta/init/reduce/summary` exist).
 
 ## Verify
-- `node --test tests/`
+- `node --test tests/rules.test.mjs`
 - `npx serve` (or any static server) at repo root; hard-refresh twice to check sw.js.
+- CSP hash after editing the import map: run the snippet in README (Develop) and paste
+  the output into the CSP meta tag. The hash is byte-exact; a whitespace change breaks it.

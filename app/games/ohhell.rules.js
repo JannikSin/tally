@@ -11,10 +11,14 @@ export const meta = {
   hint: "Bid exact or bust, down to one card.",
 };
 
-export function roundSequence(maxCards, upAndBack) {
+// mode: "down" max..1 · "downup" max..1..max · "up" 1..max · "updown" 1..max..1
+export function roundSequence(maxCards, mode) {
   const down = [];
   for (let c = maxCards; c >= 1; c--) down.push(c);
-  if (upAndBack) for (let c = 2; c <= maxCards; c++) down.push(c);
+  const up = down.slice().reverse();
+  if (mode === "up") return up;
+  if (mode === "updown") return up.concat(down.slice(1));
+  if (mode === "downup") return down.concat(up.slice(1));
   return down;
 }
 
@@ -25,8 +29,9 @@ export function maxHand(playerCount) {
 export function init(config) {
   return {
     players: config.players,
-    seq: roundSequence(config.maxCards, config.upAndBack),
+    seq: roundSequence(config.maxCards, config.mode),
     scoring: config.scoring, // "exact10" | "tricks10"
+    hook: config.hook !== false, // dealer may not even out the bids
     round: 0,
     phase: "bid",
     bids: null,
@@ -48,6 +53,7 @@ export function dealerIndex(state) {
 }
 
 export function reduce(state, action) {
+  if (state.over) return { state, line: null };
   if (action.type === "bids" && state.phase === "bid") {
     return { state: { ...state, phase: "tricks", bids: action.bids }, line: null };
   }

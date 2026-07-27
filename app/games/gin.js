@@ -29,6 +29,7 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   const [winner, setWinner] = useState(0);
   const [kind, setKind] = useState("knock");
   const [points, setPoints] = useState(null);
+  const [morePoints, setMorePoints] = useState(false);
   const sum = rules.summary(state);
   const lead = state.totals[0] === state.totals[1] ? -1 : state.totals[0] > state.totals[1] ? 0 : 1;
 
@@ -69,10 +70,20 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
           </div>
           <h2 style="margin-top:12px">${kind === "gin" || kind === "biggin" ? "Their deadwood" : "Deadwood difference"}</h2>
           <div class="btngrid c6">
-            ${Array.from({ length: 24 }, (_, i) => i).map(
+            ${Array.from({ length: 30 }, (_, i) => i).map(
               (n) => html`<button type="button" class=${points === n ? "primary" : ""} onClick=${() => setPoints(n)}>${n}</button>`,
             )}
           </div>
+          <button type="button" class="ghost" style="width:100%;margin-top:8px" onClick=${() => setMorePoints(!morePoints)}>
+            ${morePoints ? "Fewer" : "30–98…"}
+          </button>
+          ${morePoints
+            ? html`<div class="btngrid c6" style="margin-top:8px">
+                ${Array.from({ length: 69 }, (_, i) => i + 30).map(
+                  (n) => html`<button type="button" class=${points === n ? "primary" : ""} onClick=${() => { setPoints(n); setMorePoints(false); }}>${n}</button>`,
+                )}
+              </div>`
+            : null}
           <button
             type="button" class="primary" style="width:100%;margin-top:12px"
             disabled=${points == null}

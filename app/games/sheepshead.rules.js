@@ -3,11 +3,12 @@
 //   win 61-90 (x1) · win schneider 91-120 (x2) · loss 31-60 (x1) · loss schneider 0-30 (x2)
 // Schwarz (x3) means the losing side took no tricks — a trick-count fact, so it
 // is its own bucket, not a point threshold.
-// 5-handed with a partner: picker moves 2 shares, partner 1, each defender 1.
-// No partner (3/4-handed, or picker goes alone): picker moves (n-1) shares.
+// With a partner and d defenders: each defender pays 1 share, partner gets 1,
+// picker gets d-1 (5-handed: picker 2, partner 1, defenders 1 each; 4-handed
+// called-ace: picker 1, partner 1, defenders 1 each). Zero-sum by construction.
+// No partner (or picker goes alone): picker moves (n-1) shares.
 // Leaster: fewest points with at least one trick wins; each other player pays 1.
-// "Doubled" doubles the hand (house cracking is defender-initiated and can stack
-// to 4x; a single x2 covers the common case).
+// crack: x2, crack-and-recrack: x4 (the crack multiplier stacks on the result).
 
 export const meta = {
   id: "sheepshead",
@@ -33,15 +34,17 @@ export function init(config) {
   };
 }
 
-// deltas over the active players of one hand, in units; zero-sum by construction
-export function handDeltas(activeCount, pickerIdx, partnerIdx, resultKey, doubled) {
+// deltas over the active players of one hand, in units; zero-sum by construction.
+// crack: 1 (clean), 2 (cracked), 4 (recracked)
+export function handDeltas(activeCount, pickerIdx, partnerIdx, resultKey, crack = 1) {
   const r = RESULTS.find((x) => x.key === resultKey);
-  let mult = r.mult * (doubled ? 2 : 1);
+  const mult = r.mult * crack;
   const sign = r.win ? 1 : -1;
   const deltas = Array(activeCount).fill(0);
   if (partnerIdx != null && partnerIdx !== pickerIdx) {
+    const defenders = activeCount - 2;
     for (let i = 0; i < activeCount; i++) {
-      if (i === pickerIdx) deltas[i] = 2 * mult * sign;
+      if (i === pickerIdx) deltas[i] = (defenders - 1) * mult * sign;
       else if (i === partnerIdx) deltas[i] = mult * sign;
       else deltas[i] = -mult * sign;
     }
@@ -55,18 +58,18 @@ export function handDeltas(activeCount, pickerIdx, partnerIdx, resultKey, double
 
 export function reduce(state, action) {
   if (action.type === "hand") {
-    const { active, picker, partner, result, doubled } = action;
+    const { active, picker, partner, result, crack = 1 } = action;
     const r = RESULTS.find((x) => x.key === result);
     const deltas = handDeltas(
       active.length,
       active.indexOf(picker),
       partner == null ? null : active.indexOf(partner),
       result,
-      doubled,
+      crack,
     );
     const totals = state.totals.slice();
     active.forEach((p, i) => { totals[p] += deltas[i]; });
-    const line = `${state.players[picker]}${partner != null && partner !== picker ? ` + ${state.players[partner]}` : " alone"}: ${r.label.toLowerCase()}${doubled ? " ×2" : ""}`;
+    const line = `${state.players[picker]}${partner != null && partner !== picker ? ` + ${state.players[partner]}` : " alone"}: ${r.label.toLowerCase()}${crack > 1 ? ` ×${crack}` : ""}`;
     return { state: { ...state, totals, hands: state.hands + 1 }, line };
   }
   if (action.type === "leaster") {
@@ -85,10 +88,14 @@ export function reduce(state, action) {
 }
 
 export function summary(state) {
-  const best = Math.max(...state.totals);
-  const leader = state.players[state.totals.indexOf(best)];
+  // full settlement in the line: this is what history records when the session ends
+  const pairs = state.players
+    .map((p, i) => ({ p, t: state.totals[i] }))
+    .sort((a, b) => b.t - a.t)
+    .map((x) => `${x.p} ${x.t > 0 ? "+" : ""}${x.t}`)
+    .join(" · ");
   return {
     done: false,
-    line: `${state.hands} hand${state.hands === 1 ? "" : "s"} · ${leader} up ${best > 0 ? "+" : ""}${best}`,
+    line: `${state.hands} hand${state.hands === 1 ? "" : "s"}: ${pairs}`,
   };
 }

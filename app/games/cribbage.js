@@ -113,8 +113,8 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
       )}
     </div>
     ${!sum.done
-      ? html`<div class="card">
-          <h2>Peg for ${state.players[who]}</h2>
+      ? html`<div class="card" style="border-color:${LANE_COLORS[who]}">
+          <h2 style="color:${LANE_COLORS[who]}">Peg for ${state.players[who]}</h2>
           <div class="btngrid c6">
             ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(
               (n) => html`<button type="button" onClick=${() => peg(n)}>+${n}</button>`,

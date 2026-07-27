@@ -1,12 +1,11 @@
-﻿# Vendored libraries — version manifest
+# Vendored libraries — version manifest
 
-Vendored files are NEVER edited in place. To upgrade: get David's approval,
-bump the pinned devDependency in package.json, re-copy from node_modules,
-update this manifest. The devDependency copies of preact/htm exist ONLY as
-(a) the copy source for these files and (b) types for `tsc --checkJs`.
-They must always match the versions below.
+Vendored files are NEVER edited in place. To upgrade: download the release
+files from the upstream repo/CDN by hand, replace the file, update this
+manifest, and bump `CACHE` in `sw.js` — all three or none. Nothing in
+package.json tracks these; this manifest is the only provenance record.
 
-| File | Package | Version | Source in package |
+| File | Package | Version | Source |
 |---|---|---|---|
 | preact/preact.module.js | preact | 10.29.4 | dist/preact.module.js |
 | preact/hooks.module.js | preact | 10.29.4 | hooks/dist/hooks.module.js |
@@ -15,15 +14,14 @@ They must always match the versions below.
 
 Note: hooks.module.js contains a bare `import ... from "preact"` — the app's
 index.html must serve an import map resolving "preact", "preact/hooks" and
-"htm" to these files.
-
+"htm" to these files. That import map is hash-pinned in the CSP; changing it
+means recomputing the hash (see README, Develop).
 
 ## Fonts (vendor/fonts/)
 
-Variable woff2, latin subset, fetched 2026-07-06 from Google Fonts (css2 API).
-Both licensed under the SIL Open Font License 1.1.
+Variable woff2, latin subset, fetched from Google Fonts (css2 API).
 
-| File | Family | Axis | License |
+| File | Family | Fetched | License |
 |---|---|---|---|
-| fonts/archivo-var.woff2 | Archivo | wght 100-900 (variable) | OFL 1.1 |
-| fonts/jetbrains-mono-var.woff2 | JetBrains Mono | wght 100-800 (variable) | OFL 1.1 |
+| fonts/bricolage-var.woff2 | Bricolage Grotesque | 2026-07-27 | OFL 1.1 (OFL-bricolage.txt) |
+| fonts/jetbrains-mono-var.woff2 | JetBrains Mono | 2026-07-06 | OFL 1.1 (LICENSE-jetbrains-mono.txt) |

@@ -11,13 +11,50 @@ test("rules modules stay pure and honor the contract", () => {
   for (const f of ruleFiles) {
     const src = readFileSync(new URL(f, gamesDir), "utf8");
     assert.ok(!/from ["'](htm|preact)/.test(src), `${f} imports UI libs`);
-    assert.ok(!/innerHTML|dangerouslySetInnerHTML|eval\(/.test(src), `${f} unsafe API`);
   }
   for (const m of modules) {
     assert.ok(m.meta?.id && m.meta.name && m.meta.glyph && m.meta.hint, `${m.meta?.id} meta`);
     assert.equal(typeof m.init, "function");
     assert.equal(typeof m.reduce, "function");
     assert.equal(typeof m.summary, "function");
+  }
+});
+
+test("no unsafe DOM APIs anywhere in the app", () => {
+  const appDir = new URL("../app/", import.meta.url);
+  const files = [
+    ...readdirSync(appDir).filter((f) => f.endsWith(".js")).map((f) => new URL(f, appDir)),
+    ...readdirSync(gamesDir).filter((f) => f.endsWith(".js")).map((f) => new URL(f, gamesDir)),
+    new URL("../sw.js", import.meta.url),
+    new URL("../index.html", import.meta.url),
+  ];
+  for (const file of files) {
+    const src = readFileSync(file, "utf8");
+    assert.ok(
+      !/innerHTML|dangerouslySetInnerHTML|\beval\(|new Function\(/.test(src),
+      `${file.pathname} uses an unsafe API`,
+    );
+  }
+});
+
+test("CSP hash matches the inline import map byte for byte", async () => {
+  const { createHash } = await import("node:crypto");
+  const htmlSrc = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const map = htmlSrc.match(/<script type="importmap">([\s\S]*?)<\/script>/);
+  assert.ok(map, "import map present");
+  const hash = createHash("sha256").update(map[1]).digest("base64");
+  assert.ok(htmlSrc.includes(`'sha256-${hash}'`), "CSP hash out of date — see README Develop");
+});
+
+test("service worker precaches every shipped app module", () => {
+  const sw = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
+  const appDir = new URL("../app/", import.meta.url);
+  const shipped = [
+    ...readdirSync(appDir).filter((f) => f.endsWith(".js") || f.endsWith(".css")).map((f) => `./app/${f}`),
+    ...readdirSync(gamesDir).filter((f) => f.endsWith(".js")).map((f) => `./app/games/${f}`),
+  ];
+  for (const path of shipped) {
+    assert.ok(sw.includes(`"${path}"`), `${path} missing from PRECACHE`);
   }
 });
 
@@ -184,30 +221,32 @@ import * as sheep from "../app/games/sheepshead.rules.js";
 test("sheepshead deltas are zero-sum in every configuration", () => {
   for (const n of [3, 4, 5]) {
     for (const r of sheep.RESULTS) {
-      for (const doubled of [false, true]) {
-        const alone = sheep.handDeltas(n, 0, null, r.key, doubled);
-        assert.equal(alone.reduce((a, b) => a + b, 0), 0, `${n}p alone ${r.key}`);
-        if (n === 5) {
-          const withPartner = sheep.handDeltas(5, 0, 1, r.key, doubled);
-          assert.equal(withPartner.reduce((a, b) => a + b, 0), 0, `5p partner ${r.key}`);
+      for (const crack of [1, 2, 4]) {
+        const alone = sheep.handDeltas(n, 0, null, r.key, crack);
+        assert.equal(alone.reduce((a, b) => a + b, 0), 0, `${n}p alone ${r.key} x${crack}`);
+        if (n >= 4) {
+          const withPartner = sheep.handDeltas(n, 0, 1, r.key, crack);
+          assert.equal(withPartner.reduce((a, b) => a + b, 0), 0, `${n}p partner ${r.key} x${crack}`);
         }
       }
     }
   }
 });
 
-test("sheepshead 5-handed shares: picker 2, partner 1, defenders 1", () => {
-  assert.deepEqual(sheep.handDeltas(5, 0, 1, "win", false), [2, 1, -1, -1, -1]);
-  assert.deepEqual(sheep.handDeltas(5, 0, 1, "winSchneider", false), [4, 2, -2, -2, -2]);
-  assert.deepEqual(sheep.handDeltas(5, 0, 1, "lossSchwarz", false), [-6, -3, 3, 3, 3]);
-  assert.deepEqual(sheep.handDeltas(5, 0, 1, "win", true), [4, 2, -2, -2, -2]);
-  assert.deepEqual(sheep.handDeltas(5, 0, null, "win", false), [4, -1, -1, -1, -1]);
-  assert.deepEqual(sheep.handDeltas(3, 1, null, "loss", false), [1, -2, 1]);
+test("sheepshead shares: 5-hand picker 2/partner 1, 4-hand called ace 1/1, cracks stack", () => {
+  assert.deepEqual(sheep.handDeltas(5, 0, 1, "win", 1), [2, 1, -1, -1, -1]);
+  assert.deepEqual(sheep.handDeltas(5, 0, 1, "winSchneider", 1), [4, 2, -2, -2, -2]);
+  assert.deepEqual(sheep.handDeltas(5, 0, 1, "lossSchwarz", 1), [-6, -3, 3, 3, 3]);
+  assert.deepEqual(sheep.handDeltas(5, 0, 1, "win", 2), [4, 2, -2, -2, -2]);
+  assert.deepEqual(sheep.handDeltas(5, 0, 1, "win", 4), [8, 4, -4, -4, -4]);
+  assert.deepEqual(sheep.handDeltas(4, 0, 1, "win", 1), [1, 1, -1, -1]);
+  assert.deepEqual(sheep.handDeltas(5, 0, null, "win", 1), [4, -1, -1, -1, -1]);
+  assert.deepEqual(sheep.handDeltas(3, 1, null, "loss", 1), [1, -2, 1]);
 });
 
 test("sheepshead hand and leaster application", () => {
   let s = sheep.init({ players: ["P1", "P2", "P3", "P4", "P5"] });
-  s = sheep.reduce(s, { type: "hand", active: [0, 1, 2, 3, 4], picker: 2, partner: 4, result: "win", doubled: false }).state;
+  s = sheep.reduce(s, { type: "hand", active: [0, 1, 2, 3, 4], picker: 2, partner: 4, result: "win", crack: 1 }).state;
   assert.deepEqual(s.totals, [-1, -1, 2, -1, 1]);
   s = sheep.reduce(s, { type: "leaster", active: [0, 1, 2, 3, 4], winner: 0 }).state;
   assert.deepEqual(s.totals, [3, -2, 1, -2, 0]);
@@ -219,9 +258,11 @@ test("sheepshead hand and leaster application", () => {
 // ---------- oh hell ----------
 import * as oh from "../app/games/ohhell.rules.js";
 
-test("oh hell round sequence and both scoring presets", () => {
-  assert.deepEqual(oh.roundSequence(3, false), [3, 2, 1]);
-  assert.deepEqual(oh.roundSequence(3, true), [3, 2, 1, 2, 3]);
+test("oh hell round sequences and both scoring presets", () => {
+  assert.deepEqual(oh.roundSequence(3, "down"), [3, 2, 1]);
+  assert.deepEqual(oh.roundSequence(3, "downup"), [3, 2, 1, 2, 3]);
+  assert.deepEqual(oh.roundSequence(3, "up"), [1, 2, 3]);
+  assert.deepEqual(oh.roundSequence(3, "updown"), [1, 2, 3, 2, 1]);
   assert.equal(oh.maxHand(4), 10);
   assert.equal(oh.maxHand(7), 6);
   assert.deepEqual(oh.scoreRound("exact10", [2, 0, 1], [2, 1, 0]), [12, 0, 0]);
@@ -229,7 +270,7 @@ test("oh hell round sequence and both scoring presets", () => {
 });
 
 test("oh hell full game flow", () => {
-  let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 2, upAndBack: false, scoring: "exact10" });
+  let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 2, mode: "down", scoring: "exact10" });
   assert.equal(oh.dealerIndex(s), 0);
   s = oh.reduce(s, { type: "bids", bids: [1, 0, 0] }).state;
   assert.equal(s.phase, "tricks");
@@ -240,9 +281,11 @@ test("oh hell full game flow", () => {
   s = oh.reduce(s, { type: "bids", bids: [0, 1, 0] }).state;
   s = oh.reduce(s, { type: "tricks", tricks: [0, 1, 0] }).state;
   assert.equal(s.over, true);
-  assert.match(oh.summary(s).line, /P2 wins with 11|P1 wins/);
   assert.deepEqual(s.totals, [21, 11, 20]);
   assert.match(oh.summary(s).line, /P1 wins with 21/);
+  // over-guard: further actions are no-ops
+  const after = oh.reduce(s, { type: "bids", bids: [0, 0, 0] });
+  assert.equal(after.state, s);
 });
 
 // ---------- rook ----------
@@ -291,4 +334,19 @@ test("store survives corrupt and truncated data", async () => {
   store.undo("euchre");
   assert.deepEqual(store.session("euchre").state, { score: [0, 0] });
   assert.equal(store.session("euchre").log.length, 0);
+
+  // typeof null === "object": a games:null backup must be rejected, not accepted
+  assert.throws(() => store.importJSON('{"schema":1,"games":null,"roster":[],"history":{}}'));
+  assert.throws(() => store.importJSON('{"schema":1,"games":[],"roster":[],"history":{}}'));
+  assert.throws(() => store.importJSON('{"schema":1,"games":{"euchre":{"state":null,"log":[],"undo":[]}},"roster":[],"history":{}}'));
+  assert.ok(store.session("euchre"), "failed import must not clobber the live db");
+
+  // a valid import stashes the outgoing db for recovery
+  store.importJSON('{"schema":1,"games":{},"roster":[],"history":{}}');
+  assert.ok(mem.get("tally.v1.prev").includes("euchre"));
+  assert.equal(store.session("euchre"), null);
+
+  // placeholder names never pollute the roster
+  store.rememberPlayers(["Player 1", "Team 2", "East", "We", "P-Real Name"]);
+  assert.deepEqual(store.roster(), ["P-Real Name"]);
 });

@@ -70,6 +70,7 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   const [level, setLevel] = useState(0);
   const [strain, setStrain] = useState(null);
   const [dbl, setDbl] = useState(0);
+  const [confirmAbandon, setConfirmAbandon] = useState(false);
   const sum = rules.summary(state);
   const reset = () => { setLevel(0); setStrain(null); setDbl(0); };
   const ready = level > 0 && strain;
@@ -113,7 +114,14 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
           <div class="btngrid c3">
             <button type="button" onClick=${() => dispatch({ type: "honors", side: declarer, kind: "h4" })}>Honors 100</button>
             <button type="button" onClick=${() => dispatch({ type: "honors", side: declarer, kind: "h5" })}>Honors 150</button>
-            <button type="button" onClick=${() => dispatch({ type: "abandon" })}>End rubber</button>
+            <button
+              type="button"
+              class=${confirmAbandon ? "primary" : ""}
+              onClick=${() => {
+                if (confirmAbandon) { dispatch({ type: "abandon" }); setConfirmAbandon(false); }
+                else { setConfirmAbandon(true); setTimeout(() => setConfirmAbandon(false), 3500); }
+              }}
+            >${confirmAbandon ? "End it?" : "End rubber"}</button>
           </div>
           <p class="hint-line">Honors go to the side picked above. All five trump honors or four aces at NT = 150; four trump honors = 100 (one hand only).</p>
         </div>`

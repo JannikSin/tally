@@ -4,22 +4,34 @@
 
 const KEY = "tally.v1";
 const SCHEMA = 1;
-const UNDO_CAP = 10;
+// 30 snapshots ≈ a full cribbage pegging flurry; state is <1 KB so this is cheap.
+const UNDO_CAP = 30;
+const NAME_MAX = 24;
 
 const fresh = () => ({ schema: SCHEMA, roster: [], games: {}, history: {} });
+
+const isPlainObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+
+// Shared by load() and importJSON(): typeof null is "object", so shape checks
+// must be explicit or a bad backup bricks every boot.
+function validate(data) {
+  if (!isPlainObject(data) || data.schema !== SCHEMA) throw new Error("bad shape");
+  if (!isPlainObject(data.games) || !Array.isArray(data.roster)) throw new Error("bad shape");
+  for (const s of Object.values(data.games)) {
+    if (!isPlainObject(s) || !isPlainObject(s.state) || !Array.isArray(s.log) || !Array.isArray(s.undo)) {
+      throw new Error("bad session");
+    }
+  }
+  if (!isPlainObject(data.history)) data.history = {};
+  return data;
+}
 
 function load() {
   let raw = null;
   try {
     raw = localStorage.getItem(KEY);
     if (!raw) return fresh();
-    const data = JSON.parse(raw);
-    if (
-      !data || typeof data !== "object" || data.schema !== SCHEMA ||
-      typeof data.games !== "object" || !Array.isArray(data.roster)
-    ) throw new Error("bad shape");
-    if (!data.history || typeof data.history !== "object") data.history = {};
-    return data;
+    return validate(JSON.parse(raw));
   } catch {
     try { if (raw) localStorage.setItem(KEY + ".corrupt", raw); } catch { /* quota: drop */ }
     return fresh();
@@ -86,8 +98,11 @@ export const store = {
 
   rememberPlayers(names) {
     for (const n of names) {
-      const name = String(n).slice(0, 24).trim();
-      if (name && !db.roster.includes(name)) db.roster.unshift(name);
+      const name = String(n).trim().slice(0, NAME_MAX);
+      // skip auto-filled defaults so the quick-pick roster stays real people
+      if (!name || /^(player|team) \d+$/i.test(name)) continue;
+      if (["East", "South", "West", "North", "We", "They"].includes(name)) continue;
+      if (!db.roster.includes(name)) db.roster.unshift(name);
     }
     db.roster.length = Math.min(db.roster.length, 24);
     save();
@@ -98,13 +113,9 @@ export const store = {
   },
 
   importJSON(text) {
-    const data = JSON.parse(text); // caller catches
-    if (!data || data.schema !== SCHEMA || typeof data.games !== "object") {
-      throw new Error("Not a Tally backup");
-    }
+    const data = validate(JSON.parse(text)); // caller catches
+    try { localStorage.setItem(KEY + ".prev", JSON.stringify(db)); } catch { /* quota */ }
     db = data;
-    if (!db.history || typeof db.history !== "object") db.history = {};
-    if (!Array.isArray(db.roster)) db.roster = [];
     save();
   },
 };

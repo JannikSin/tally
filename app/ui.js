@@ -64,7 +64,7 @@ export function PlayerNames({ count, names, onChange, roster, labels }) {
 export function ScoreBar({ entries }) {
   return html`<div class="scorebar">
     ${entries.map(
-      (e) => html`<div class=${"scorebox" + (e.lead ? " lead" : "") + (e.active ? " active" : "")}>
+      (e) => html`<div class=${"scorebox" + (e.lead ? " lead" : "")}>
         <div class="who">${e.who}</div>
         <div class="pts">${e.pts}</div>
         ${e.sub ? html`<div class="who">${e.sub}</div>` : null}

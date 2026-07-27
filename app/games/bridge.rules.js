@@ -66,6 +66,7 @@ export function totals(state) {
 const push = (log, pts, note) => log.push({ pts, note });
 
 export function reduce(state, action) {
+  if (!["honors", "abandon", "contract"].includes(action.type)) return { state, line: null };
   const s = structuredClone(state);
   if (action.type === "honors") {
     const pts = action.kind === "h4" ? 100 : 150;
@@ -83,8 +84,6 @@ export function reduce(state, action) {
     const t = totals(s);
     return { state: s, line: `Rubber abandoned (${s.teams[0]} ${t[0]} – ${s.teams[1]} ${t[1]})` };
   }
-  if (action.type !== "contract") return { state, line: null };
-
   const { declarer, level, strain, dbl, tricks } = action; // tricks: + made overtricks, 0 = exact, negative = down n
   const vul = s.vul[declarer];
   const defender = 1 - declarer;

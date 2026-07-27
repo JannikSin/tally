@@ -84,6 +84,18 @@ input[type="text"], input[type="number"] {
 
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
+.iconlink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  color: var(--chalk);
+  font-size: 22px;
+  text-decoration: none;
+}
+.home-head .iconlink { color: var(--chalk-dim); }
+
 /* ---------- shell ---------- */
 #app { max-width: 560px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; }
 

@@ -9,8 +9,9 @@ export { rules };
 export function Setup({ onStart, roster, history }) {
   const [count, setCount] = useState(4);
   const [names, setNames] = useState(Array(7).fill(""));
-  const [upAndBack, setUpAndBack] = useState(false);
+  const [mode, setMode] = useState("down");
   const [scoring, setScoring] = useState("exact10");
+  const [hook, setHook] = useState(true);
   const [maxCards, setMaxCards] = useState(rules.maxHand(4));
   return html`<div>
     <div class="card">
@@ -27,12 +28,15 @@ export function Setup({ onStart, roster, history }) {
     <div class="card">
       <h2>Rounds</h2>
       <${Stepper} label="Biggest hand" value=${maxCards} min=${3} max=${rules.maxHand(count)} onChange=${setMaxCards} />
-      <div style="margin-top:10px">
-        <${Seg}
-          options=${[{ value: false, label: `${maxCards} down to 1` }, { value: true, label: "Down and back up" }]}
-          value=${upAndBack}
-          onChange=${setUpAndBack}
-        />
+      <div class="btngrid c2" style="margin-top:10px">
+        ${[
+          { value: "down", label: `${maxCards} down to 1` },
+          { value: "downup", label: "Down and back up" },
+          { value: "up", label: `1 up to ${maxCards}` },
+          { value: "updown", label: "Up and back down" },
+        ].map(
+          (o) => html`<button type="button" class=${mode === o.value ? "primary" : ""} onClick=${() => setMode(o.value)}>${o.label}</button>`,
+        )}
       </div>
       <h2 style="margin-top:14px">Scoring</h2>
       <${Seg}
@@ -40,12 +44,18 @@ export function Setup({ onStart, roster, history }) {
         value=${scoring}
         onChange=${setScoring}
       />
+      <div class="row" style="margin-top:10px">
+        <button type="button" class=${hook ? "primary" : "ghost"} style="font-size:13px" onClick=${() => setHook(!hook)}>
+          Dealer hook rule ${hook ? "on" : "off"}
+        </button>
+      </div>
+      <p class="hint-line">Hook rule: the dealer's bid may not make total bids equal the tricks available.</p>
     </div>
     <button
       type="button" class="primary" style="width:100%"
       onClick=${() => onStart({
         players: Array.from({ length: count }, (_, i) => names[i]?.trim() || `Player ${i + 1}`),
-        maxCards, upAndBack, scoring,
+        maxCards, mode, scoring, hook,
       })}
     >Deal the first hand</button>
     ${history.length
@@ -64,7 +74,8 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   const dealer = rules.dealerIndex(state);
   const entrySum = entry.reduce((a, b) => a + b, 0);
   const bidPhase = state.phase === "bid";
-  const hooked = bidPhase && entrySum === cards;
+  const evenBids = bidPhase && entrySum === cards;
+  const hooked = evenBids && state.hook !== false; // hook off: warn, don't block
   const trickOk = !bidPhase && entrySum === cards;
   const best = Math.max(...state.totals);
 
@@ -99,7 +110,9 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
             ${bidPhase
               ? hooked
                 ? html`<span class="warn">Bids total ${entrySum} — the dealer can't make it come out even.</span>`
-                : `Bids total ${entrySum} of ${cards}.`
+                : evenBids
+                  ? html`<span class="warn">Bids come out even — someone has to miss.</span>`
+                  : `Bids total ${entrySum} of ${cards}.`
               : `Tricks total ${entrySum}; must equal ${cards}.`}
           </p>
           <button

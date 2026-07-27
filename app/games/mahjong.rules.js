@@ -36,10 +36,14 @@ export function reduce(state, action) {
 }
 
 export function summary(state) {
-  const best = Math.max(...state.totals);
-  const leader = state.players[state.totals.indexOf(best)];
+  // full settlement in the line: this is what history records when the session ends
+  const pairs = state.players
+    .map((p, i) => ({ p, t: state.totals[i] }))
+    .sort((a, b) => b.t - a.t)
+    .map((x) => `${x.p} ${x.t > 0 ? "+" : ""}${x.t}`)
+    .join(" · ");
   return {
     done: false,
-    line: `${state.round} hand${state.round === 1 ? "" : "s"} · ${leader} up ${best > 0 ? "+" : ""}${best}`,
+    line: `${state.round} hand${state.round === 1 ? "" : "s"}: ${pairs}`,
   };
 }

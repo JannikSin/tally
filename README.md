@@ -25,9 +25,16 @@ Works offline once installed.
 ## Develop
 
 ```
-node --test tests/rules.test.mjs   # scoring rules
+node --test tests/rules.test.mjs   # scoring rules + contract/purity/CSP checks
 node tools/make-icons.mjs          # regenerate icons
 node tools/bake-board.mjs          # regenerate the cribbage "29" track
+```
+
+If you edit the inline import map in `index.html`, recompute its CSP hash
+(byte-exact) and paste it into the CSP meta tag:
+
+```
+node -e "const f=require('fs').readFileSync('index.html','utf8');const m=f.match(/<script type=\"importmap\">([\s\S]*?)<\/script>/);console.log('sha256-'+require('crypto').createHash('sha256').update(m[1]).digest('base64'))"
 ```
 
 Scoring logic lives in `app/games/*.rules.js` (pure, dependency-free, tested);

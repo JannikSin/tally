@@ -49,12 +49,12 @@ export function Play({ state, log, dispatch, onDone }) {
   const [sitting, setSitting] = useState([]);
   const [picker, setPicker] = useState(null);
   const [partner, setPartner] = useState(null); // null = alone
-  const [doubled, setDoubled] = useState(false);
+  const [crack, setCrack] = useState(1);
   const [leaster, setLeaster] = useState(false);
   const active = state.players.map((_, i) => i).filter((i) => !sitting.includes(i));
   const okSitters = sitting.length === seats;
-  const reset = () => { setPicker(null); setPartner(null); setDoubled(false); setLeaster(false); setSitting([]); };
-  const fiveHanded = active.length === 5;
+  const reset = () => { setPicker(null); setPartner(null); setCrack(1); setLeaster(false); setSitting([]); };
+  const partnerAllowed = active.length >= 4; // called-ace works 4- and 5-handed
 
   return html`<div>
     <div class="card">
@@ -102,7 +102,7 @@ export function Play({ state, log, dispatch, onDone }) {
                   <div class="row wrap" style="margin-bottom:8px">
                     ${active.map((i) => html`<${Chip} on=${picker === i} onClick=${() => { setPicker(i); if (partner === i) setPartner(null); }}>${state.players[i]}<//>`)}
                   </div>
-                  ${picker != null && fiveHanded
+                  ${picker != null && partnerAllowed
                     ? html`<p class="hint-line">Partner:</p>
                         <div class="row wrap" style="margin-bottom:8px">
                           <${Chip} on=${partner === null} onClick=${() => setPartner(null)}>Alone<//>
@@ -114,11 +114,13 @@ export function Play({ state, log, dispatch, onDone }) {
                   ${picker != null
                     ? html`
                         <div class="row" style="margin:6px 0 10px">
-                          <${Chip} on=${doubled} onClick=${() => setDoubled(!doubled)}>Doubled ×2<//>
+                          <${Chip} on=${crack > 1} onClick=${() => setCrack(crack === 1 ? 2 : crack === 2 ? 4 : 1)}>
+                            ${crack === 1 ? "Clean" : crack === 2 ? "Cracked ×2" : "Recracked ×4"}
+                          <//>
                         </div>
                         <div class="btngrid c2">
                           ${rules.RESULTS.map(
-                            (r) => html`<button type="button" onClick=${() => { dispatch({ type: "hand", active, picker, partner, result: r.key, doubled }); reset(); }}>
+                            (r) => html`<button type="button" onClick=${() => { dispatch({ type: "hand", active, picker, partner, result: r.key, crack }); reset(); }}>
                               <div style="font-weight:600" class=${r.win ? "" : "neg"}>${r.label}</div>
                               <div style="font-size:12px;color:var(--chalk-dim)">${r.desc}</div>
                             </button>`,

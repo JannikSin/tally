@@ -32,14 +32,16 @@ export function Play({ state, log, dispatch, onDone }) {
   const [winner, setWinner] = useState(null);
   const [amount, setAmount] = useState("");
   const [deltas, setDeltas] = useState(Array(n).fill(""));
-  const parsed = deltas.map((d) => parseInt(d, 10) || 0);
+  // signs live in chips, not the keyboard: the iOS numeric pad has no minus key
+  const [signs, setSigns] = useState(Array(n).fill(1));
+  const parsed = deltas.map((d, i) => (parseInt(d, 10) || 0) * signs[i]);
   const freeSum = parsed.reduce((a, b) => a + b, 0);
   const amt = parseInt(amount, 10) || 0;
   const [keepEast, setKeepEast] = useState(false);
 
   const submit = (ds, ke) => {
     dispatch({ type: "round", deltas: ds, keepEast: ke });
-    setWinner(null); setAmount(""); setDeltas(Array(n).fill("")); setKeepEast(false);
+    setWinner(null); setAmount(""); setDeltas(Array(n).fill("")); setSigns(Array(n).fill(1)); setKeepEast(false);
   };
 
   return html`<div>
@@ -87,9 +89,14 @@ export function Play({ state, log, dispatch, onDone }) {
         : html`
             ${state.players.map(
               (p, i) => html`<div class="row" style="margin-bottom:8px">
-                <span style="width:90px;color:var(--chalk-dim);font-size:13px;overflow:hidden;text-overflow:ellipsis">${p}</span>
-                <input type="number" inputmode="numeric" placeholder="±0" value=${deltas[i]}
-                  onInput=${(e) => { const d = deltas.slice(); d[i] = e.target.value; setDeltas(d); }} />
+                <span style="width:80px;color:var(--chalk-dim);font-size:13px;overflow:hidden;text-overflow:ellipsis">${p}</span>
+                <button type="button" class=${signs[i] < 0 ? "" : "ghost"}
+                  style=${signs[i] < 0 ? "color:var(--loss);min-width:44px" : "min-width:44px"}
+                  aria-label=${signs[i] < 0 ? "losing points" : "winning points"}
+                  onClick=${() => { const s = signs.slice(); s[i] = -s[i]; setSigns(s); }}
+                >${signs[i] < 0 ? "−" : "+"}</button>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" value=${deltas[i]}
+                  onInput=${(e) => { const d = deltas.slice(); d[i] = e.target.value.replace(/\D/g, ""); setDeltas(d); }} />
               </div>`,
             )}
             <p class="hint-line">${freeSum === 0 ? "Balances to zero." : `Off by ${freeSum > 0 ? "+" : ""}${freeSum} (fine if your rules aren't zero-sum).`}</p>

@@ -12,7 +12,6 @@ import * as bridge from "./games/bridge.js";
 import * as mahjong from "./games/mahjong.js";
 
 const GAMES = [euchre, cribbage, sheepshead, ohhell, gin, bridge, rook, mahjong];
-const byId = Object.fromEntries(GAMES.map((g) => [g.meta.id, g]));
 
 function useHash() {
   const [hash, setHash] = useState(location.hash.slice(1));
@@ -24,12 +23,12 @@ function useHash() {
   return hash;
 }
 
-function Home({ bump }) {
+function Home() {
   return html`<div class="fade-in">
     <header class="home-head">
       <div class="row">
         <h1 class="grow">Tally</h1>
-        <a href="#settings" class="ghost" style="color:var(--chalk-dim);font-size:22px;text-decoration:none;padding:8px" aria-label="Settings">⛭</a>
+        <a href="#settings" class="iconlink" aria-label="Settings">⛭</a>
       </div>
       <p>Deal the cards. This keeps the score.</p>
     </header>
@@ -56,7 +55,7 @@ function Settings() {
   const [msg, setMsg] = useState("");
   return html`<div class="fade-in">
     <div class="topbar">
-      <a href="#" class="ghost" style="color:var(--chalk);font-size:22px;text-decoration:none;padding:4px 10px" aria-label="Back">‹</a>
+      <a href="#" class="iconlink" aria-label="Back">‹</a>
       <h1>Settings</h1>
     </div>
     <div class="screen">
@@ -119,6 +118,7 @@ function GameScreen({ game, bump }) {
   const dispatch = (action) => {
     const s = store.session(meta.id);
     const r = rules.reduce(s.state, action);
+    if (r.state === s.state) return; // reducer no-op: don't burn an undo slot
     store.apply(meta.id, r.state, r.line ?? null);
     bump();
   };
@@ -144,7 +144,7 @@ function GameScreen({ game, bump }) {
 
   return html`<div class="fade-in">
     <div class="topbar">
-      <a href="#" class="ghost" style="color:var(--chalk);font-size:22px;text-decoration:none;padding:4px 10px" aria-label="Back">‹</a>
+      <a href="#" class="iconlink" aria-label="Back">‹</a>
       <h1>${meta.name}</h1>
       ${session
         ? html`
@@ -159,10 +159,10 @@ function GameScreen({ game, bump }) {
               type="button"
               class=${confirmEnd ? "primary" : "ghost"}
               onClick=${() => {
-                if (confirmEnd) { store.end(meta.id, null); bump(); }
-                else { setConfirmEnd(true); setTimeout(() => setConfirmEnd(false), 2500); }
+                if (confirmEnd) finish(); // records the summary line in history
+                else { setConfirmEnd(true); setTimeout(() => setConfirmEnd(false), 3500); }
               }}
-            >${confirmEnd ? "Sure?" : "✕"}</button>`
+            >${confirmEnd ? "End game?" : "✕"}</button>`
         : null}
     </div>
     <div class="screen">
@@ -179,9 +179,9 @@ function App() {
   const bump = () => setTick((t) => t + 1);
   useEffect(() => scrollTo(0, 0), [hash]);
   if (hash === "settings") return html`<${Settings} />`;
-  const game = byId[hash];
+  const game = GAMES.find((g) => g.meta.id === hash);
   if (game) return html`<${GameScreen} game=${game} bump=${bump} key=${hash} />`;
-  return html`<${Home} bump=${bump} />`;
+  return html`<${Home} />`;
 }
 
 render(html`<${App} />`, document.getElementById("app"));
