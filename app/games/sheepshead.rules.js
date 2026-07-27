@@ -7,8 +7,14 @@
 // picker gets d-1 (5-handed: picker 2, partner 1, defenders 1 each; 4-handed
 // called-ace: picker 1, partner 1, defenders 1 each). Zero-sum by construction.
 // No partner (or picker goes alone): picker moves (n-1) shares.
-// Leaster: fewest points with at least one trick wins; each other player pays 1.
-// crack: x2, crack-and-recrack: x4 (the crack multiplier stacks on the result).
+// Leaster house rule (config.leasterRule, default "fewest"):
+//   "fewest" — fewest points (with a trick) wins; a tie pushes (no score)
+//   "trick" — fewest points wins; a tie is broken by first trick, so never a push
+//   "jackOfDiamonds" — whoever takes the jack of diamonds wins outright
+//   "doubler" — no leaster at all: redeal, next hand's stakes double (stacks
+//     if it happens again) via state.pendingDouble, consumed by the next hand/leaster
+// crack: x2, crack-and-recrack: x4 (the crack multiplier stacks on the result,
+// and on any pending doubler).
 
 export const meta = {
   id: "sheepshead",
@@ -31,6 +37,8 @@ export function init(config) {
     players: config.players,
     totals: Array(config.players.length).fill(0),
     hands: 0,
+    leasterRule: config.leasterRule || "fewest", // "fewest" | "trick" | "jackOfDiamonds" | "doubler"
+    pendingDouble: 1, // set by a "doubler" redeal; consumed by the next hand/leaster
   };
 }
 
@@ -57,32 +65,39 @@ export function handDeltas(activeCount, pickerIdx, partnerIdx, resultKey, crack 
 }
 
 export function reduce(state, action) {
+  if (action.type === "redeal") {
+    // all passed under the "doubler" house rule: void hand, next hand's stakes double
+    const pendingDouble = (state.pendingDouble || 1) * 2;
+    return { state: { ...state, pendingDouble }, line: `Redeal, all passed: next hand pays ×${pendingDouble}` };
+  }
   if (action.type === "hand") {
     const { active, picker, partner, result, crack = 1 } = action;
     const r = RESULTS.find((x) => x.key === result);
+    const doubler = state.pendingDouble || 1;
     const deltas = handDeltas(
       active.length,
       active.indexOf(picker),
       partner == null ? null : active.indexOf(partner),
       result,
-      crack,
+      crack * doubler,
     );
     const totals = state.totals.slice();
     active.forEach((p, i) => { totals[p] += deltas[i]; });
-    const line = `${state.players[picker]}${partner != null && partner !== picker ? ` + ${state.players[partner]}` : " alone"}: ${r.label.toLowerCase()}${crack > 1 ? ` ×${crack}` : ""}`;
-    return { state: { ...state, totals, hands: state.hands + 1 }, line };
+    const line = `${state.players[picker]}${partner != null && partner !== picker ? ` + ${state.players[partner]}` : " alone"}: ${r.label.toLowerCase()}${crack > 1 ? ` ×${crack}` : ""}${doubler > 1 ? ` (doubler ×${doubler})` : ""}`;
+    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1 }, line };
   }
   if (action.type === "leaster") {
     const { active, winner, noWinner } = action;
+    const doubler = state.pendingDouble || 1;
     const totals = state.totals.slice();
     let line;
     if (noWinner) {
       line = "Leaster, tied for fewest: no score";
     } else {
-      active.forEach((p) => { totals[p] += p === winner ? active.length - 1 : -1; });
-      line = `Leaster: ${state.players[winner]} takes it`;
+      active.forEach((p) => { totals[p] += (p === winner ? active.length - 1 : -1) * doubler; });
+      line = `Leaster: ${state.players[winner]} takes it${doubler > 1 ? ` (doubler ×${doubler})` : ""}`;
     }
-    return { state: { ...state, totals, hands: state.hands + 1 }, line };
+    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1 }, line };
   }
   return { state, line: null };
 }

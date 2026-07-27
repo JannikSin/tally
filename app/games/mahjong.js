@@ -38,6 +38,18 @@ export function Play({ state, log, dispatch, onDone }) {
   const freeSum = parsed.reduce((a, b) => a + b, 0);
   const amt = parseInt(amount, 10) || 0;
   const [keepEast, setKeepEast] = useState(false);
+  const [eastDoubles, setEastDoubles] = useState(false);
+  // collect-mode deltas honoring "East pays/wins double" when enabled
+  const collectDeltas = () => {
+    const ds = Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      if (i === winner) continue;
+      const pays = eastDoubles && (i === state.east || winner === state.east) ? amt * 2 : amt;
+      ds[i] = -pays;
+      ds[winner] += pays;
+    }
+    return ds;
+  };
 
   const submit = (ds, ke) => {
     dispatch({ type: "round", deltas: ds, keepEast: ke });
@@ -75,17 +87,15 @@ export function Play({ state, log, dispatch, onDone }) {
               )}
             </div>
             <input type="number" inputmode="numeric" placeholder="Points from each player" value=${amount} onInput=${(e) => setAmount(e.target.value)} />
-            <div class="row" style="margin-top:8px">
+            <div class="row wrap" style="margin-top:8px">
               <button type="button" class=${keepEast ? "primary" : ""} style="font-size:13px" onClick=${() => setKeepEast(!keepEast)}>East keeps the deal</button>
+              <button type="button" class=${eastDoubles ? "primary" : ""} style="font-size:13px" onClick=${() => setEastDoubles(!eastDoubles)}>East pays/wins double</button>
             </div>
             <button
               type="button" class="primary" style="width:100%;margin-top:10px"
               disabled=${winner == null || amt <= 0}
-              onClick=${() => {
-                const ds = state.players.map((_, i) => (i === winner ? amt * (n - 1) : -amt));
-                submit(ds, keepEast);
-              }}
-            >${winner == null || amt <= 0 ? "Score hand" : `${state.players[winner]} +${amt * (n - 1)}`}</button>`
+              onClick=${() => submit(collectDeltas(), keepEast)}
+            >${winner == null || amt <= 0 ? "Score hand" : `${state.players[winner]} +${collectDeltas()[winner]}`}</button>`
         : html`
             ${state.players.map(
               (p, i) => html`<div class="row" style="margin-bottom:8px">
@@ -99,7 +109,11 @@ export function Play({ state, log, dispatch, onDone }) {
                   onInput=${(e) => { const d = deltas.slice(); d[i] = e.target.value.replace(/\D/g, ""); setDeltas(d); }} />
               </div>`,
             )}
-            <p class="hint-line">${freeSum === 0 ? "Balances to zero." : `Off by ${freeSum > 0 ? "+" : ""}${freeSum} (fine if your rules aren't zero-sum).`}</p>
+            <p class="hint-line">${parsed.every((d) => d === 0)
+              ? "Enter at least one score, or use a Draw button below for a wall game."
+              : freeSum === 0
+                ? "Balances to zero."
+                : `Off by ${freeSum > 0 ? "+" : ""}${freeSum} (fine if your rules aren't zero-sum).`}</p>
             <div class="row" style="margin-top:4px">
               <button type="button" class=${keepEast ? "primary" : ""} style="font-size:13px" onClick=${() => setKeepEast(!keepEast)}>East keeps the deal</button>
             </div>
@@ -108,6 +122,14 @@ export function Play({ state, log, dispatch, onDone }) {
               disabled=${parsed.every((d) => d === 0)}
               onClick=${() => submit(parsed, keepEast)}
             >Score hand</button>`}
+      <div class="row" style="margin-top:10px">
+        <button type="button" class="ghost grow" style="font-size:13px"
+          onClick=${() => { dispatch({ type: "draw", keepEast: true }); }}
+        >Draw — East keeps deal</button>
+        <button type="button" class="ghost grow" style="font-size:13px"
+          onClick=${() => { dispatch({ type: "draw", keepEast: false }); }}
+        >Draw — pass the deal</button>
+      </div>
     </div>
     <div class="card"><h2>Hands</h2><${LogList} lines=${log} /></div>
     <button type="button" style="width:100%" onClick=${onDone}>Finish session</button>

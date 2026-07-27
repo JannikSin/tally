@@ -75,6 +75,16 @@ test("euchre scoring and win", () => {
   for (let i = 0; i < 3; i++) s = euchre.reduce(s, { type: "hand", makers: 0, result: "march" }).state;
   assert.equal(euchre.summary(s).done, true);
   assert.match(euchre.summary(s).line, /We win 11–4/);
+  // post-win guard: further hands are no-ops
+  assert.equal(euchre.reduce(s, { type: "hand", makers: 1, result: "made" }).state, s);
+});
+
+test("euchre winner-first line and alone tag", () => {
+  let s = euchre.init({ teams: ["We", "They"], target: 2 });
+  const r = s && euchre.reduce(s, { type: "hand", makers: 1, result: "made", alone: true });
+  assert.match(r.line, /They alone made it/);
+  s = euchre.reduce(r.state, { type: "hand", makers: 1, result: "made" }).state;
+  assert.match(euchre.summary(s).line, /They win 2–0/); // winner's score first
 });
 
 // ---------- bridge ----------
@@ -148,10 +158,10 @@ test("bridge doubled part-score with insult and abandon bonuses", () => {
   const g = s.belowGames[0];
   assert.equal(g.entries[0][0].pts, 80);
   assert.equal(s.aboveLog[0][0].pts, 150);
-  // abandon: We get 50 part-score bonus only (no games yet)
+  // abandon: We get the 100 part-score bonus only (no games yet)
   r = bridge.reduce(s, { type: "abandon" });
   s = r.state;
-  assert.ok(s.aboveLog[0].some((e) => e.note === "part-score" && e.pts === 50));
+  assert.ok(s.aboveLog[0].some((e) => e.note === "part-score" && e.pts === 100));
   assert.ok(!s.aboveLog[0].some((e) => e.note === "unfinished game"));
   assert.equal(s.over, true);
 });
@@ -255,6 +265,38 @@ test("sheepshead hand and leaster application", () => {
   assert.match(tie.line, /no score/);
 });
 
+test("sheepshead house rules: leasterRule defaults and doubler carries into the next hand", () => {
+  assert.equal(sheep.init({ players: ["P1", "P2"] }).leasterRule, "fewest");
+  assert.equal(sheep.init({ players: ["P1", "P2"], leasterRule: "jackOfDiamonds" }).leasterRule, "jackOfDiamonds");
+
+  let s = sheep.init({ players: ["P1", "P2", "P3", "P4", "P5"], leasterRule: "doubler" });
+  assert.equal(s.pendingDouble, 1);
+  const redeal = sheep.reduce(s, { type: "redeal" });
+  s = redeal.state;
+  assert.equal(s.pendingDouble, 2);
+  assert.deepEqual(s.totals, [0, 0, 0, 0, 0]); // redeal is a void hand: no money moves
+  assert.equal(s.hands, 0); // and doesn't count as a played hand
+  assert.match(redeal.line, /×2/);
+
+  // next hand pays double, then the doubler is spent
+  const doubled = sheep.reduce(s, { type: "hand", active: [0, 1, 2, 3, 4], picker: 0, partner: 1, result: "win", crack: 1 });
+  assert.deepEqual(doubled.state.totals, [4, 2, -2, -2, -2]); // 2x the normal [2,1,-1,-1,-1]
+  assert.equal(doubled.state.pendingDouble, 1);
+  const clean = sheep.reduce(doubled.state, { type: "hand", active: [0, 1, 2, 3, 4], picker: 0, partner: 1, result: "win", crack: 1 });
+  assert.deepEqual(
+    clean.state.totals.map((t, i) => t - doubled.state.totals[i]),
+    [2, 1, -1, -1, -1],
+  );
+
+  // a doubler pending into a leaster also doubles, and stacks if passed out twice
+  let s2 = sheep.reduce(sheep.init({ players: ["P1", "P2", "P3", "P4", "P5"] }), { type: "redeal" }).state;
+  s2 = sheep.reduce(s2, { type: "redeal" }).state;
+  assert.equal(s2.pendingDouble, 4);
+  const leastered = sheep.reduce(s2, { type: "leaster", active: [0, 1, 2, 3, 4], winner: 0 });
+  assert.deepEqual(leastered.state.totals, [16, -4, -4, -4, -4]); // (5-1)*4, -1*4 each
+  assert.equal(leastered.state.pendingDouble, 1);
+});
+
 // ---------- oh hell ----------
 import * as oh from "../app/games/ohhell.rules.js";
 
@@ -288,6 +330,35 @@ test("oh hell full game flow", () => {
   assert.equal(after.state, s);
 });
 
+test("oh hell misdeal skip voids the round in place", () => {
+  let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 3, mode: "down", scoring: "exact10" });
+  s = oh.reduce(s, { type: "bids", bids: [1, 1, 0] }).state;
+  const r = oh.reduce(s, { type: "skip" });
+  assert.equal(r.state.phase, "bid");
+  assert.equal(r.state.bids, null);
+  assert.equal(r.state.round, 0); // same round, redealt
+  assert.match(r.line, /thrown in/);
+});
+
+test("gin wall hand records but scores nothing", () => {
+  let s = gin.init({ players: ["P1", "P2"] });
+  const r = gin.reduce(s, { type: "wall" });
+  assert.deepEqual(r.state.totals, [0, 0]);
+  assert.deepEqual(r.state.boxes, [0, 0]);
+  assert.match(r.line, /Wall/);
+});
+
+test("mahjong draw advances or keeps the deal without payments", () => {
+  let s = mah.init({ players: ["P1", "P2", "P3", "P4"] });
+  let r = mah.reduce(s, { type: "draw", keepEast: true });
+  assert.equal(r.state.east, 0);
+  assert.equal(r.state.round, 1);
+  assert.deepEqual(r.state.totals, [0, 0, 0, 0]);
+  r = mah.reduce(r.state, { type: "draw", keepEast: false });
+  assert.equal(r.state.east, 1);
+  assert.match(r.line, /deal passes/);
+});
+
 // ---------- rook ----------
 import * as rook from "../app/games/rook.rules.js";
 
@@ -301,6 +372,14 @@ test("rook made and set hands", () => {
   s = rook.reduce(s, { type: "hand", bidTeam: 0, bid: 100, captured: 100 }).state;
   assert.equal(s.over, true);
   assert.match(rook.summary(s).line, /We win 340–20/);
+});
+
+test("rook deck variants change the defender remainder and bid ceiling", () => {
+  assert.deepEqual(rook.handScore(0, 100, 100, 140), { made: true, delta: [100, 40] });
+  assert.deepEqual(rook.handScore(0, 150, 120, 180), { made: false, delta: [-150, 60] });
+  let s = rook.init({ teams: ["We", "They"], target: 300, deck: 140 });
+  s = rook.reduce(s, { type: "hand", bidTeam: 0, bid: 100, captured: 90 }).state;
+  assert.deepEqual(s.totals, [-100, 50]); // set: defenders keep 140-90
 });
 
 // ---------- mahjong ----------

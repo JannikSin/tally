@@ -68,6 +68,9 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
               </button>`,
             )}
           </div>
+          ${kind === "undercut"
+            ? html`<p class="hint-line" style="color:var(--brass)">Winner above = the DEFENDER who undercut the knocker. A tie in deadwood counts (enter 0).</p>`
+            : null}
           <h2 style="margin-top:12px">${kind === "gin" || kind === "biggin" ? "Their deadwood" : "Deadwood difference"}</h2>
           <div class="btngrid c6">
             ${Array.from({ length: 30 }, (_, i) => i).map(
@@ -75,11 +78,11 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
             )}
           </div>
           <button type="button" class="ghost" style="width:100%;margin-top:8px" onClick=${() => setMorePoints(!morePoints)}>
-            ${morePoints ? "Fewer" : "30–98…"}
+            ${morePoints ? "Fewer" : "30–100…"}
           </button>
           ${morePoints
             ? html`<div class="btngrid c6" style="margin-top:8px">
-                ${Array.from({ length: 69 }, (_, i) => i + 30).map(
+                ${Array.from({ length: 71 }, (_, i) => i + 30).map(
                   (n) => html`<button type="button" class=${points === n ? "primary" : ""} onClick=${() => { setPoints(n); setMorePoints(false); }}>${n}</button>`,
                 )}
               </div>`
@@ -89,6 +92,9 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
             disabled=${points == null}
             onClick=${() => { dispatch({ type: "hand", winner, kind, points }); setPoints(null); setKind("knock"); }}
           >Score hand${points != null ? ` · +${points + rules.KINDS.find((k) => k.key === kind).bonus}` : ""}</button>
+          <button type="button" class="ghost" style="width:100%;margin-top:6px;font-size:13px"
+            onClick=${() => dispatch({ type: "wall" })}
+          >Wall — stock ran out, no score</button>
         </div>`}
     <div class="card"><h2>Hands</h2><${LogList} lines=${log} /></div>
   </div>`;

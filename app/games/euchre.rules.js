@@ -5,6 +5,7 @@ export const meta = {
   id: "euchre",
   name: "Euchre",
   glyph: "♣",
+  tint: "sky",
   hint: "Teams to 10. Loners pay four.",
 };
 
@@ -25,13 +26,14 @@ export const RESULTS = [
 ];
 
 export function reduce(state, action) {
-  if (action.type !== "hand") return { state, line: null };
+  if (action.type !== "hand" || summary(state).done) return { state, line: null };
   const r = RESULTS.find((x) => x.key === action.result);
   const scorer = r.toMakers ? action.makers : 1 - action.makers;
   const score = state.score.slice();
   score[scorer] += r.pts;
   const next = { ...state, score, hands: state.hands + 1 };
-  const line = `${state.teams[action.makers]} ${r.toMakers ? r.label.toLowerCase() : "euchred"}, ${state.teams[scorer]} +${r.pts} (${score[0]}–${score[1]})`;
+  const alone = action.alone ? " alone" : "";
+  const line = `${state.teams[action.makers]}${alone} ${r.toMakers ? r.label.toLowerCase() : "euchred"}, ${state.teams[scorer]} +${r.pts} (${score[0]}–${score[1]})`;
   return { state: next, line };
 }
 
@@ -42,7 +44,7 @@ export function summary(state) {
   return {
     done,
     line: done
-      ? `${state.teams[winner]} win ${a}–${b}`
+      ? `${state.teams[winner]} win ${winner === 0 ? `${a}–${b}` : `${b}–${a}`}`
       : `${state.teams[0]} ${a} – ${state.teams[1]} ${b}`,
   };
 }

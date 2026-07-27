@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./ohhell.rules.js";
 import { PlayerNames, LogList, OverBanner, Seg, Stepper } from "../ui.js";
@@ -70,6 +70,9 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   const n = state.players.length;
   const cards = state.seq[state.round];
   const [entry, setEntry] = useState(Array(n).fill(0));
+  // reset the entry row whenever the phase or round changes (incl. via undo),
+  // so stale taps never leak into the next entry
+  useEffect(() => setEntry(Array(n).fill(0)), [state.phase, state.round, n]);
   const sum = rules.summary(state);
   const dealer = rules.dealerIndex(state);
   const entrySum = entry.reduce((a, b) => a + b, 0);
@@ -98,13 +101,17 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
       : html`<div class="card">
           <h2>Round ${state.round + 1} of ${state.seq.length} · ${cards} card${cards === 1 ? "" : "s"} · ${bidPhase ? "bids" : "tricks taken"}</h2>
           ${state.players.map(
-            (p, i) => html`<${Stepper}
-              label=${bidPhase ? p : `${p} (bid ${state.bids[i]})`}
-              value=${entry[i]}
-              min=${0}
-              max=${cards}
-              onChange=${(v) => { const e = entry.slice(); e[i] = v; setEntry(e); }}
-            />`,
+            (p, i) => html`<div style="margin-bottom:10px">
+              <div class="hint-line" style="margin:0 0 4px">${bidPhase ? p : `${p} · bid ${state.bids[i]}`}</div>
+              <div class="row wrap">
+                ${Array.from({ length: cards + 1 }, (_, v) => html`<button
+                  type="button"
+                  class=${entry[i] === v ? "primary" : ""}
+                  style="min-width:42px;min-height:40px;padding:4px 0;font-size:15px"
+                  onClick=${() => { const e = entry.slice(); e[i] = v; setEntry(e); }}
+                >${v}</button>`)}
+              </div>
+            </div>`,
           )}
           <p class="hint-line">
             ${bidPhase
@@ -123,6 +130,9 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
               setEntry(Array(n).fill(0));
             }}
           >${bidPhase ? "Lock bids" : "Score round"}</button>
+          <button type="button" class="ghost" style="width:100%;margin-top:6px;font-size:13px"
+            onClick=${() => dispatch({ type: "skip" })}
+          >Misdeal — throw this hand in</button>
         </div>`}
     <div class="card"><h2>Rounds</h2><${LogList} lines=${log} /></div>
   </div>`;

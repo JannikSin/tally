@@ -54,6 +54,10 @@ export function dealerIndex(state) {
 
 export function reduce(state, action) {
   if (state.over) return { state, line: null };
+  if (action.type === "skip") {
+    // misdeal / thrown-in hand: no scores, the round is redealt in place
+    return { state: { ...state, phase: "bid", bids: null }, line: `${state.seq[state.round]}-card hand thrown in, redeal` };
+  }
   if (action.type === "bids" && state.phase === "bid") {
     return { state: { ...state, phase: "tricks", bids: action.bids }, line: null };
   }

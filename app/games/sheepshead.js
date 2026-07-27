@@ -6,9 +6,17 @@ import { PlayerNames, LogList, Seg } from "../ui.js";
 export const meta = rules.meta;
 export { rules };
 
+const LEASTER_RULES = [
+  { value: "fewest", label: "Fewest points, tie = push" },
+  { value: "trick", label: "Fewest points, first trick breaks tie" },
+  { value: "jackOfDiamonds", label: "Jack of diamonds takes it" },
+  { value: "doubler", label: "No leaster — redeal, next hand doubles" },
+];
+
 export function Setup({ onStart, roster, history }) {
   const [count, setCount] = useState(5);
   const [names, setNames] = useState(Array(7).fill(""));
+  const [leasterRule, setLeasterRule] = useState("fewest");
   return html`<div>
     <div class="card">
       <h2>Players</h2>
@@ -22,9 +30,16 @@ export function Setup({ onStart, roster, history }) {
       </div>
       ${count > 5 ? html`<p class="hint-line">Hands play five-handed; pick who sits out each hand.</p>` : null}
     </div>
+    <div class="card">
+      <h2>House rules</h2>
+      <p class="hint-line">If everyone passes (leaster):</p>
+      <div class="row wrap" style="margin-top:8px">
+        ${LEASTER_RULES.map((o) => html`<${Chip} on=${leasterRule === o.value} onClick=${() => setLeasterRule(o.value)}>${o.label}<//>`)}
+      </div>
+    </div>
     <button
       type="button" class="primary" style="width:100%"
-      onClick=${() => onStart({ players: Array.from({ length: count }, (_, i) => names[i]?.trim() || `Player ${i + 1}`) })}
+      onClick=${() => onStart({ players: Array.from({ length: count }, (_, i) => names[i]?.trim() || `Player ${i + 1}`), leasterRule })}
     >Start session</button>
     ${history.length
       ? html`<div class="card" style="margin-top:12px"><h2>Past sessions</h2>
@@ -53,6 +68,8 @@ export function Play({ state, log, dispatch, onDone }) {
   const [leaster, setLeaster] = useState(false);
   const active = state.players.map((_, i) => i).filter((i) => !sitting.includes(i));
   const okSitters = sitting.length === seats;
+  const leasterRule = state.leasterRule || "fewest"; // old sessions predate this field
+  const pendingDouble = state.pendingDouble || 1;
   const reset = () => { setPicker(null); setPartner(null); setCrack(1); setLeaster(false); setSitting([]); };
   const partnerAllowed = active.length >= 4; // called-ace works 4- and 5-handed
 
@@ -75,6 +92,7 @@ export function Play({ state, log, dispatch, onDone }) {
     </div>
     <div class="card">
       <h2>Score a hand</h2>
+      ${pendingDouble > 1 ? html`<p class="hint-line">Doubler active from a redeal: this hand pays ×${pendingDouble}.</p>` : null}
       ${seats > 0
         ? html`<p class="hint-line">Sitting out (${sitting.length}/${seats}):</p>
             <div class="row wrap" style="margin-bottom:10px">
@@ -92,11 +110,20 @@ export function Play({ state, log, dispatch, onDone }) {
               <${Chip} on=${leaster} onClick=${() => { setLeaster(!leaster); setPicker(null); setPartner(null); }}>Leaster (all passed)<//>
             </div>
             ${leaster
-              ? html`<p class="hint-line">Fewest points with at least one trick wins.</p>
-                  <div class="row wrap">
-                    ${active.map((i) => html`<${Chip} onClick=${() => { dispatch({ type: "leaster", active, winner: i }); reset(); }}>${state.players[i]} won<//>`)}
-                    <${Chip} onClick=${() => { dispatch({ type: "leaster", active, noWinner: true }); reset(); }}>Tie, no score<//>
-                  </div>`
+              ? leasterRule === "doubler"
+                ? html`<p class="hint-line">House rule: no leaster. Redeal the hand; the next hand pays double.</p>
+                    <${Chip} onClick=${() => { dispatch({ type: "redeal" }); reset(); }}>Redeal, double next hand<//>`
+                : html`<p class="hint-line">${
+                    leasterRule === "trick"
+                      ? "Fewest points wins; a tie is broken by whoever took the first trick."
+                      : leasterRule === "jackOfDiamonds"
+                        ? "Whoever takes the jack of diamonds wins outright."
+                        : "Fewest points with at least one trick wins."
+                  }</p>
+                    <div class="row wrap">
+                      ${active.map((i) => html`<${Chip} onClick=${() => { dispatch({ type: "leaster", active, winner: i }); reset(); }}>${state.players[i]} won<//>`)}
+                      ${leasterRule === "fewest" ? html`<${Chip} onClick=${() => { dispatch({ type: "leaster", active, noWinner: true }); reset(); }}>Tie, no score<//>` : null}
+                    </div>`
               : html`
                   <p class="hint-line">Picker:</p>
                   <div class="row wrap" style="margin-bottom:8px">
@@ -114,10 +141,11 @@ export function Play({ state, log, dispatch, onDone }) {
                   ${picker != null
                     ? html`
                         <div class="row" style="margin:6px 0 10px">
-                          <${Chip} on=${crack > 1} onClick=${() => setCrack(crack === 1 ? 2 : crack === 2 ? 4 : 1)}>
-                            ${crack === 1 ? "Clean" : crack === 2 ? "Cracked ×2" : "Recracked ×4"}
-                          <//>
+                          ${[[1, "Clean"], [2, "Cracked ×2"], [4, "Recracked ×4"]].map(
+                            ([v, label]) => html`<${Chip} on=${crack === v} onClick=${() => setCrack(v)}>${label}<//>`,
+                          )}
                         </div>
+                        <p class="hint-line">Schwarz outranks schneider: check tricks taken before card points.</p>
                         <div class="btngrid c2">
                           ${rules.RESULTS.map(
                             (r) => html`<button type="button" onClick=${() => { dispatch({ type: "hand", active, picker, partner, result: r.key, crack }); reset(); }}>

@@ -66,7 +66,7 @@ export function ScoreBar({ entries }) {
     ${entries.map(
       (e) => html`<div class=${"scorebox" + (e.lead ? " lead" : "")}>
         <div class="who">${e.who}</div>
-        <div class="pts">${e.pts}</div>
+        <div class=${"pts" + (typeof e.pts === "number" && e.pts < 0 ? " neg" : "")}>${e.pts}</div>
         ${e.sub ? html`<div class="who">${e.sub}</div>` : null}
       </div>`,
     )}

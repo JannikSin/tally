@@ -4,13 +4,14 @@
 // Undertricks: undoubled 50/100 per trick (nv/v); doubled nv 100,200,200,300...;
 // doubled v 200,300,300...; redoubled doubles the doubled figures.
 // Insult 50/100. Slams 500/750/1000/1500. Rubber bonus 700 (2-0) / 500 (2-1).
-// Unfinished rubber: 300 per side with a game, 50 for a part-score in the open game.
+// Unfinished rubber: 300 per side with a game, 100 for a part-score in the open game.
 // Honors (single hand only): 4 trump honors 100, 5 trump honors or 4 aces at NT 150.
 
 export const meta = {
   id: "bridge",
   name: "Bridge",
   glyph: "♠",
+  tint: "sky",
   hint: "Rubber scoring, above and below the line.",
 };
 
@@ -77,7 +78,7 @@ export function reduce(state, action) {
     for (const i of [0, 1]) {
       if (s.games[i] === 1) push(s.aboveLog[i], 300, "unfinished game");
       const open = s.belowGames[s.belowGames.length - 1];
-      if (open.winner === null && open.entries[i].length) push(s.aboveLog[i], 50, "part-score");
+      if (open.winner === null && open.entries[i].length) push(s.aboveLog[i], 100, "part-score");
     }
     s.over = true;
     s.result = "abandoned";

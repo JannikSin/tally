@@ -38,7 +38,12 @@ export function finalTally(totals, boxes) {
 }
 
 export function reduce(state, action) {
-  if (action.type !== "hand" || state.over) return { state, line: null };
+  if (state.over) return { state, line: null };
+  if (action.type === "wall") {
+    // stock ran out with no knock: a real gin outcome, no score, hand is void
+    return { state: { ...state }, line: "Wall hand, no score" };
+  }
+  if (action.type !== "hand") return { state, line: null };
   const { winner, kind, points } = action;
   const k = KINDS.find((x) => x.key === kind);
   const gain = points + k.bonus;

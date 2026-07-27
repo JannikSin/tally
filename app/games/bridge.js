@@ -38,7 +38,7 @@ function Pad({ state }) {
       ${[0, 1].map(
         (i) => html`<div style=${`padding:8px 12px;${i === 0 ? "border-right:1px solid var(--line);" : ""}`}>
           <div style="text-align:center;font-weight:600;color:var(--chalk-dim);padding-bottom:6px">
-            ${state.teams[i]}${state.vul[i] ? html`<span class="warn"> · vul</span>` : null}
+            ${state.teams[i]}${state.vul[i] ? html`<span class="warn" style="font-weight:700"> · VUL</span>` : null}
           </div>
           <div style="min-height:70px">
             ${state.aboveLog[i].map((e) => html`<div class="num" style="text-align:right;font-size:15px">${e.pts}</div>`)}
@@ -96,7 +96,7 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
                 onClick=${() => setStrain(st)}>${rules.STRAIN_LABEL[st]}</button>`,
             )}
             <button type="button" class=${dbl > 0 ? "primary" : ""} onClick=${() => setDbl((dbl + 1) % 3)}>
-              ${dbl === 2 ? "××" : dbl === 1 ? "×" : "dbl?"}
+              ${dbl === 2 ? "××" : dbl === 1 ? "×" : "no dbl"}
             </button>
           </div>
           ${ready
@@ -105,25 +105,37 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
                   ${Array.from({ length: overMax + 1 }, (_, i) => html`<button type="button" class="primary"
                     onClick=${() => { dispatch({ type: "contract", declarer, level, strain, dbl, tricks: i }); reset(); }}
                   >${i === 0 ? "Made =" : `+${i}`}</button>`)}
+                </div>
+                <div class="btngrid c4" style="margin-top:8px">
                   ${Array.from({ length: downMax }, (_, i) => html`<button type="button"
+                    style="border-color:color-mix(in srgb, var(--loss) 55%, var(--line))"
                     onClick=${() => { dispatch({ type: "contract", declarer, level, strain, dbl, tricks: -(i + 1) }); reset(); }}
-                  ><span class="neg">−${i + 1}</span></button>`)}
+                  ><span class="neg">down ${i + 1}</span></button>`)}
                 </div>`
             : html`<p class="hint-line">Pick level and strain, then score the result.</p>`}
-          <h2 style="margin-top:14px">Bonuses</h2>
-          <div class="btngrid c3">
-            <button type="button" onClick=${() => dispatch({ type: "honors", side: declarer, kind: "h4" })}>Honors 100</button>
-            <button type="button" onClick=${() => dispatch({ type: "honors", side: declarer, kind: "h5" })}>Honors 150</button>
+          <h2 style="margin-top:14px">Honors</h2>
+          <div class="btngrid c4">
+            ${[0, 1].map((side) =>
+              [["h4", 100], ["h5", 150]].map(
+                ([kind, pts]) => html`<button type="button" onClick=${() => dispatch({ type: "honors", side, kind })}>
+                  <div style="font-size:12.5px;color:var(--chalk-dim)">${state.teams[side]}</div>
+                  <div style="font-weight:600">+${pts}</div>
+                </button>`,
+              ),
+            )}
+          </div>
+          <p class="hint-line">Four trump honors in one hand = 100; all five, or four aces at NT = 150.</p>
+          <div class="row" style="margin-top:10px">
             <button
               type="button"
-              class=${confirmAbandon ? "primary" : ""}
+              class=${confirmAbandon ? "primary" : "ghost"}
+              style="width:100%;font-size:13px"
               onClick=${() => {
                 if (confirmAbandon) { dispatch({ type: "abandon" }); setConfirmAbandon(false); }
                 else { setConfirmAbandon(true); setTimeout(() => setConfirmAbandon(false), 3500); }
               }}
-            >${confirmAbandon ? "End it?" : "End rubber"}</button>
+            >${confirmAbandon ? "End the rubber here?" : "End rubber early"}</button>
           </div>
-          <p class="hint-line">Honors go to the side picked above. All five trump honors or four aces at NT = 150; four trump honors = 100 (one hand only).</p>
         </div>`
       : null}
     <div class="card"><h2>Hands</h2><${LogList} lines=${log} /></div>

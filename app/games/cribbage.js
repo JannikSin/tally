@@ -126,10 +126,13 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
           ${more
             ? html`<div class="btngrid c6" style="margin-top:8px">
                 ${Array.from({ length: 17 }, (_, i) => i + 13).map(
-                  (n) => html`<button type="button" onClick=${() => { peg(n); setMore(false); }}>+${n}</button>`,
+                  (n) => html`<button type="button" onClick=${() => peg(n)}>+${n}</button>`,
                 )}
               </div>`
             : null}
+          <button type="button" class="ghost" style="width:100%;margin-top:8px;font-size:13px" onClick=${() => peg(0)}>
+            Counted, nothing scored (+0)
+          </button>
         </div>`
       : null}
     <div class="card"><h2>Pegging</h2><${LogList} lines=${log} /></div>

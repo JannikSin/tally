@@ -40,7 +40,8 @@ export function Setup({ onStart, history }) {
 }
 
 export function Play({ state, log, dispatch, onRematch, onDone }) {
-  const [makers, setMakers] = useState(0);
+  const [makers, setMakers] = useState(null); // re-pick every hand: stale makers = silent wrong team
+  const [alone, setAlone] = useState(false);
   const sum = rules.summary(state);
   const lead = state.score[0] === state.score[1] ? -1 : state.score[0] > state.score[1] ? 0 : 1;
   return html`<div>
@@ -56,14 +57,22 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
             value=${makers}
             onChange=${setMakers}
           />
-          <div class="btngrid c2" style="margin-top:12px">
-            ${rules.RESULTS.map(
-              (r) => html`<button type="button" onClick=${() => dispatch({ type: "hand", makers, result: r.key })}>
-                <div style="font-weight:600">${r.label}</div>
-                <div style="font-size:12px;color:var(--chalk-dim)">${r.desc} · ${r.toMakers ? "+" : "them +"}${r.pts}</div>
-              </button>`,
-            )}
-          </div>
+          ${makers != null
+            ? html`
+                <div class="row" style="margin-top:10px">
+                  <button type="button" class=${alone ? "primary" : "ghost"} style="font-size:13px" onClick=${() => setAlone(!alone)}>
+                    Went alone
+                  </button>
+                </div>
+                <div class="btngrid c2" style="margin-top:10px">
+                  ${rules.RESULTS.map(
+                    (r) => html`<button type="button" onClick=${() => { dispatch({ type: "hand", makers, result: r.key, alone }); setMakers(null); setAlone(false); }}>
+                      <div style="font-weight:600">${r.label}</div>
+                      <div style="font-size:12px;color:var(--chalk-dim)">${r.desc} · ${r.toMakers ? "+" : "them +"}${r.pts}</div>
+                    </button>`,
+                  )}
+                </div>`
+            : html`<p class="hint-line">Pick the calling team to score the hand. All passed twice? Just redeal.</p>`}
         </div>`}
     <div class="card"><h2>Hands</h2><${LogList} lines=${log} /></div>
   </div>`;

@@ -22,6 +22,14 @@ export function init(config) {
 }
 
 export function reduce(state, action) {
+  if (action.type === "draw") {
+    // exhaustive draw / wall game: no payments, the deal keeps or passes
+    const east = action.keepEast ? state.east : (state.east + 1) % state.players.length;
+    return {
+      state: { ...state, east, round: state.round + 1 },
+      line: `Draw — ${action.keepEast ? `${state.players[state.east]} keeps the deal` : "deal passes"}`,
+    };
+  }
   if (action.type !== "round") return { state, line: null };
   const { deltas, keepEast } = action;
   const totals = state.totals.map((t, i) => t + deltas[i]);

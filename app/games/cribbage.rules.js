@@ -5,6 +5,7 @@ export const meta = {
   id: "cribbage",
   name: "Cribbage",
   glyph: "29",
+  tint: "brass",
   hint: "Peg to 121 on the 29 board.",
 };
 
@@ -24,7 +25,7 @@ export function reduce(state, action) {
   const { player, pts } = action;
   const scores = state.scores.slice();
   const back = state.back.slice();
-  back[player] = scores[player];
+  if (pts > 0) back[player] = scores[player]; // +0 "counted" entries leave the pegs alone
   scores[player] = Math.min(121, scores[player] + pts);
   const over = scores[player] >= 121;
   const next = { ...state, scores, back, over, winner: over ? player : null };

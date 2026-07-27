@@ -37,7 +37,7 @@ function Home() {
         const s = store.session(g.meta.id);
         const sum = s ? g.rules.summary(s.state) : null;
         return html`<button class="tile" onClick=${() => (location.hash = g.meta.id)}>
-          <span class="glyph">${g.meta.glyph}</span>
+          <span class="glyph" style=${g.meta.tint ? `color:var(--${g.meta.tint === "brass" ? "brass" : "sky"});font-weight:700` : ""}>${g.meta.glyph}</span>
           <span class="name">${g.meta.name}</span>
           ${s
             ? html`<span class="resume">${sum.done ? "Finished" : "Resume"}</span>
