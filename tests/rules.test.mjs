@@ -349,4 +349,9 @@ test("store survives corrupt and truncated data", async () => {
   // placeholder names never pollute the roster
   store.rememberPlayers(["Player 1", "Team 2", "East", "We", "P-Real Name"]);
   assert.deepEqual(store.roster(), ["P-Real Name"]);
+
+  // history and roster contents are validated too, not just their containers
+  assert.throws(() => store.importJSON('{"schema":1,"games":{},"roster":[],"history":{"euchre":"junk"}}'));
+  store.importJSON('{"schema":1,"games":{},"roster":[{"evil":1},"P-Ok"],"history":{}}');
+  assert.deepEqual(store.roster(), ["P-Ok"]);
 });

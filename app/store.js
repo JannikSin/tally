@@ -23,6 +23,10 @@ function validate(data) {
     }
   }
   if (!isPlainObject(data.history)) data.history = {};
+  for (const v of Object.values(data.history)) {
+    if (!Array.isArray(v)) throw new Error("bad history");
+  }
+  data.roster = data.roster.filter((x) => typeof x === "string");
   return data;
 }
 

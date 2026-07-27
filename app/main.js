@@ -130,7 +130,9 @@ function GameScreen({ game, bump }) {
   const finish = () => {
     const s = store.session(meta.id);
     const sum = rules.summary(s.state);
-    store.end(meta.id, sum.line);
+    // open-ended games (sheepshead, mahjong) are never "done"; their line IS the settlement
+    const openEnded = !("done" in sum) || meta.id === "sheepshead" || meta.id === "mahjong";
+    store.end(meta.id, sum.done || openEnded ? sum.line : `${sum.line} (unfinished)`);
     bump();
   };
   const rematch = () => {
