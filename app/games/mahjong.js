@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./mahjong.rules.js";
-import { PlayerNames, LogList, Seg } from "../ui.js";
+import { PlayerNames, ScoreBand, LogList, Seg } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
@@ -57,19 +57,14 @@ export function Play({ state, log, dispatch, onDone }) {
   };
 
   return html`<div>
-    <div class="card">
-      <h2>Standings</h2>
-      <table class="ledger">
-        <tbody>
-          ${state.players.map(
-            (p, i) => html`<tr>
-              <td style="font-family:var(--body)">${p}${i === state.east ? html`<span class="warn"> · East</span>` : null}</td>
-              <td class=${state.totals[i] < 0 ? "neg" : state.totals[i] > 0 ? "pos" : ""}>${state.totals[i] > 0 ? "+" : ""}${state.totals[i]}</td>
-            </tr>`,
-          )}
-        </tbody>
-      </table>
-    </div>
+    <${ScoreBand}
+      signed
+      cells=${state.players.map((p, i) => ({
+        who: i === state.east ? `${p} · E` : p,
+        pts: state.totals[i],
+        dealer: i === state.east,
+      }))}
+    />
     <div class="card">
       <h2>Score a hand</h2>
       <${Seg}

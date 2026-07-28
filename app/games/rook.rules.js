@@ -30,6 +30,7 @@ export function init(config) {
     totals: [0, 0],
     rounds: [],
     over: false,
+    stats: { sets: [0, 0], maxBids: [0, 0] }, // rivalry counters (maxBids = full-deck bids made)
   };
 }
 
@@ -47,17 +48,29 @@ export function reduce(state, action) {
   const { made, delta } = handScore(bidTeam, bid, captured, state.deck || DECK);
   const totals = [state.totals[0] + delta[0], state.totals[1] + delta[1]];
   const rounds = state.rounds.concat([{ delta, totals: totals.slice() }]);
+  const stats = structuredClone(state.stats || { sets: [0, 0], maxBids: [0, 0] });
+  if (!made) stats.sets[bidTeam] += 1;
+  if (made && bid >= (state.deck || DECK)) stats.maxBids[bidTeam] += 1;
   const over =
     (totals[0] >= state.target || totals[1] >= state.target) && totals[0] !== totals[1];
   const line = `${state.teams[bidTeam]} bid ${bid}, ${made ? `made ${captured}` : `set (took ${captured})`} · ${totals[0]}–${totals[1]}`;
-  return { state: { ...state, totals, rounds, over }, line };
+  return { state: { ...state, totals, rounds, over, stats }, line };
 }
 
 export function summary(state) {
   const [a, b] = state.totals;
+  const st = state.stats || { sets: [0, 0], maxBids: [0, 0] };
+  const result = {
+    participants: state.teams.slice(),
+    winner: state.over ? state.teams[a > b ? 0 : 1] : null,
+    stats: {
+      "Times set": { [state.teams[0]]: st.sets[0], [state.teams[1]]: st.sets[1] },
+      "Full-deck bids made": { [state.teams[0]]: st.maxBids[0], [state.teams[1]]: st.maxBids[1] },
+    },
+  };
   if (state.over) {
     const w = a > b ? 0 : 1;
-    return { done: true, line: `${state.teams[w]} win ${Math.max(a, b)}–${Math.min(a, b)}` };
+    return { done: true, line: `${state.teams[w]} win ${Math.max(a, b)}–${Math.min(a, b)}`, result };
   }
-  return { done: false, line: `${state.teams[0]} ${a} – ${state.teams[1]} ${b} · to ${state.target}` };
+  return { done: false, line: `${state.teams[0]} ${a} – ${state.teams[1]} ${b} · to ${state.target}`, result };
 }

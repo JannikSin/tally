@@ -129,9 +129,26 @@ export function reduce(state, action) {
 export function summary(state) {
   const t = totals(state);
   const score = `${state.teams[0]} ${t[0]} – ${state.teams[1]} ${t[1]}`;
+  // made slam-level contracts leave an above-line entry noted "6x"/"7x";
+  // defender entries for failed slams say "down", so exclude those
+  const slams = [0, 1].map(
+    (i) => state.aboveLog[i].filter((e) => /^[67]/.test(e.note) && !e.note.includes("down")).length,
+  );
+  const result = {
+    participants: state.teams.slice(),
+    winner: state.over && t[0] !== t[1] ? state.teams[t[0] > t[1] ? 0 : 1] : null,
+    stats: {
+      "Slam bonuses": { [state.teams[0]]: slams[0], [state.teams[1]]: slams[1] },
+      Games: { [state.teams[0]]: state.games[0], [state.teams[1]]: state.games[1] },
+    },
+  };
   if (state.over) {
     const w = t[0] === t[1] ? -1 : t[0] > t[1] ? 0 : 1;
-    return { done: true, line: w < 0 ? `Tied rubber, ${score}` : `${state.teams[w]} take the rubber, ${score}` };
+    return {
+      done: true,
+      line: w < 0 ? `Tied rubber, ${score}` : `${state.teams[w]} take the rubber, ${score}`,
+      result,
+    };
   }
-  return { done: false, line: `${score} · games ${state.games[0]}–${state.games[1]}` };
+  return { done: false, line: `${score} · games ${state.games[0]}–${state.games[1]}`, result };
 }

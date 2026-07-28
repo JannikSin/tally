@@ -198,6 +198,127 @@ input[type="text"], input[type="number"] {
 .seg button { border: 0; border-radius: 0; flex: 1; background: transparent; min-height: 42px; }
 .seg button.on { background: var(--sky-deep); font-weight: 600; }
 
+/* ---------- big score header (2-side games) ---------- */
+.bigscore {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-radius: 18px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+}
+.bigscore .half {
+  padding: 14px 8px 12px;
+  text-align: center;
+  border: 0;
+  border-radius: 0;
+  min-height: 0;
+  background: var(--felt);
+  transition: background 0.2s;
+}
+.bigscore .half.side-a { background: linear-gradient(170deg, #1d3f6e, #16305434 60%), var(--felt); }
+.bigscore .half.side-b { background: linear-gradient(170deg, #6e5518, #54401634 60%), var(--felt); }
+.bigscore .half.picked { box-shadow: inset 0 0 0 2px var(--chalk); }
+.bigscore .who {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--chalk-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bigscore .side-a .who { color: #9cc4f5; }
+.bigscore .side-b .who { color: #ecd39a; }
+.bigscore .val {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(52px, 19vw, 84px);
+  font-weight: 720;
+  line-height: 1.05;
+  color: var(--chalk);
+}
+.bigscore .val.neg { color: var(--loss); }
+.bigscore .sub { font-size: 12px; color: var(--chalk-dim); min-height: 1.2em; }
+.bigscore .half.lead .val { color: var(--brass); }
+.bigscore .val.bump { animation: bump 0.3s ease-out; }
+@keyframes bump {
+  40% { transform: scale(1.14); }
+}
+
+/* ---------- score band (N-player games), across the screen ---------- */
+.scoreband {
+  position: sticky;
+  top: calc(58px + var(--sat));
+  z-index: 9;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.scoreband .cell {
+  background: var(--felt);
+  padding: 8px 2px 7px;
+  text-align: center;
+  border: 0;
+  border-radius: 0;
+  min-height: 0;
+  position: relative;
+}
+.scoreband .cell.active { background: var(--felt-2); box-shadow: inset 0 -3px 0 var(--sky); }
+.scoreband .cell.sitting { opacity: 0.4; }
+.scoreband .cell .nm {
+  font-size: 11px;
+  color: var(--chalk-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+.scoreband .cell .tot {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(17px, 5.4vw, 26px);
+  font-weight: 700;
+  line-height: 1.15;
+}
+.scoreband .cell .tot.bump { animation: bump 0.3s ease-out; }
+.scoreband .cell .tot.pos { color: #7fd49a; }
+.scoreband .cell .tot.neg { color: var(--loss); }
+.scoreband .dealer-dot {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brass);
+}
+
+/* ---------- confetti (win only) ---------- */
+.confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 50;
+}
+.confetti i {
+  position: absolute;
+  top: -4vh;
+  width: 8px;
+  height: 13px;
+  border-radius: 2px;
+  animation: fall 2.6s ease-in forwards;
+}
+@keyframes fall {
+  to { transform: translateY(110vh) rotate(720deg); opacity: 0.7; }
+}
+
 .scorebar {
   display: flex;
   gap: 10px;

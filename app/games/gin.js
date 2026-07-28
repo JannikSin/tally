@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./gin.rules.js";
-import { PlayerNames, ScoreBar, LogList, OverBanner, Seg } from "../ui.js";
+import { PlayerNames, BigScore, LogList, OverBanner } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
@@ -34,13 +34,15 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   const lead = state.totals[0] === state.totals[1] ? -1 : state.totals[0] > state.totals[1] ? 0 : 1;
 
   return html`<div>
-    <${ScoreBar}
+    <${BigScore}
       entries=${[0, 1].map((i) => ({
         who: state.players[i],
         pts: state.totals[i],
-        sub: `${state.boxes[i]} box${state.boxes[i] === 1 ? "" : "es"}`,
+        sub: `${state.boxes[i]} box${state.boxes[i] === 1 ? "" : "es"} · to ${state.target}`,
         lead: i === lead,
+        picked: !sum.done && winner === i,
       }))}
+      onPick=${sum.done ? null : (i) => setWinner(i)}
     />
     ${sum.done
       ? html`<${OverBanner} line=${sum.line} onRematch=${onRematch} onDone=${onDone} />
@@ -57,8 +59,7 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
             </table>
           </div>`
       : html`<div class="card">
-          <h2>Who won the hand?</h2>
-          <${Seg} options=${[0, 1].map((i) => ({ value: i, label: state.players[i] }))} value=${winner} onChange=${setWinner} />
+          <h2>${state.players[winner]} won the hand (tap the scoreboard to switch)</h2>
           <h2 style="margin-top:12px">How?</h2>
           <div class="btngrid c2">
             ${rules.KINDS.map(

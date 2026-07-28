@@ -24,6 +24,7 @@ export function init(config) {
     boxes: [0, 0],
     over: false,
     final: null,
+    stats: { gins: [0, 0], undercuts: [0, 0] }, // rivalry counters (gins incl. big gin)
   };
 }
 
@@ -51,7 +52,10 @@ export function reduce(state, action) {
   const boxes = state.boxes.slice();
   totals[winner] += gain;
   boxes[winner] += 1;
-  let next = { ...state, totals, boxes };
+  const stats = structuredClone(state.stats || { gins: [0, 0], undercuts: [0, 0] });
+  if (kind === "gin" || kind === "biggin") stats.gins[winner] += 1;
+  if (kind === "undercut") stats.undercuts[winner] += 1;
+  let next = { ...state, totals, boxes, stats };
   let line = `${state.players[winner]} ${k.label.toLowerCase()} +${gain} (${totals[0]}–${totals[1]})`;
   if (totals[winner] >= state.target) {
     next.over = true;
@@ -62,16 +66,30 @@ export function reduce(state, action) {
 }
 
 export function summary(state) {
+  const st = state.stats || { gins: [0, 0], undercuts: [0, 0] };
+  const result = {
+    participants: state.players.slice(),
+    winner: state.over ? state.players[state.final.winner] : null,
+    stats: {
+      Gins: { [state.players[0]]: st.gins[0], [state.players[1]]: st.gins[1] },
+      Undercuts: { [state.players[0]]: st.undercuts[0], [state.players[1]]: st.undercuts[1] },
+      ...(state.over && state.boxes[1 - state.final.winner] === 0
+        ? { Shutouts: { [state.players[state.final.winner]]: 1 } }
+        : {}),
+    },
+  };
   if (state.over) {
     const { winner, final } = state.final;
     const shutout = state.boxes[1 - winner] === 0;
     return {
       done: true,
       line: `${state.players[winner]} wins ${final[winner]}–${final[1 - winner]}${shutout ? " (shutout)" : ""}`,
+      result,
     };
   }
   return {
     done: false,
     line: `${state.players[0]} ${state.totals[0]} – ${state.players[1]} ${state.totals[1]}`,
+    result,
   };
 }

@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./rook.rules.js";
-import { ScoreBar, LogList, OverBanner, Seg, Stepper } from "../ui.js";
+import { BigScore, LogList, OverBanner, Seg, Stepper } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
@@ -54,14 +54,20 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   const sum = rules.summary(state);
   const lead = state.totals[0] === state.totals[1] ? -1 : state.totals[0] > state.totals[1] ? 0 : 1;
   return html`<div>
-    <${ScoreBar}
-      entries=${[0, 1].map((i) => ({ who: state.teams[i], pts: state.totals[i], lead: i === lead, sub: `to ${state.target}` }))}
+    <${BigScore}
+      entries=${[0, 1].map((i) => ({
+        who: state.teams[i],
+        pts: state.totals[i],
+        lead: i === lead,
+        picked: !sum.done && bidTeam === i,
+        sub: !sum.done && bidTeam === i ? `has the bid · to ${state.target}` : `to ${state.target}`,
+      }))}
+      onPick=${sum.done ? null : (i) => setBidTeam(i)}
     />
     ${sum.done
       ? html`<${OverBanner} line=${sum.line} onRematch=${onRematch} onDone=${onDone} />`
       : html`<div class="card">
-          <h2>Who took the bid?</h2>
-          <${Seg} options=${[0, 1].map((i) => ({ value: i, label: state.teams[i] }))} value=${bidTeam} onChange=${setBidTeam} />
+          <h2>${state.teams[bidTeam]} took the bid (tap the scoreboard to switch)</h2>
           <div style="margin-top:10px">
             <${Stepper} label="Bid" value=${bid} min=${70} max=${deck} step=${5} onChange=${setBid} />
           </div>

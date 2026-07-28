@@ -2,7 +2,7 @@ import { useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./cribbage.rules.js";
 import { PATH, VIEW, HOLES } from "./cribbage.board.js";
-import { PlayerNames, LogList, OverBanner, Seg } from "../ui.js";
+import { PlayerNames, BigScore, ScoreBand, LogList, OverBanner, Seg } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
@@ -98,20 +98,26 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   return html`<div>
     <div class="card" style="padding:8px 6px 4px"><${Board} state=${state} /></div>
     ${sum.done ? html`<${OverBanner} line=${sum.line} onRematch=${onRematch} onDone=${onDone} />` : null}
-    <div class="scorebar">
-      ${state.players.map(
-        (p, i) => html`<button
-          type="button"
-          class=${"scorebox" + (i === who ? " active" : "")}
-          style="border-color:${i === who ? LANE_COLORS[i] : "var(--line)"}"
-          onClick=${() => setWho(i)}
-        >
-          <div class="who" style="color:${LANE_COLORS[i]}">${p}</div>
-          <div class="pts">${state.scores[i]}</div>
-          <div class="who">${121 - state.scores[i]} to go</div>
-        </button>`,
-      )}
-    </div>
+    ${state.players.length === 2
+      ? html`<${BigScore}
+          entries=${state.players.map((p, i) => ({
+            who: p,
+            pts: state.scores[i],
+            lead: state.scores[i] !== state.scores[1 - i] && state.scores[i] > state.scores[1 - i],
+            picked: !sum.done && who === i,
+            sub: `${121 - state.scores[i]} to go`,
+          }))}
+          onPick=${sum.done ? null : (i) => setWho(i)}
+        />`
+      : html`<${ScoreBand}
+          cells=${state.players.map((p, i) => ({
+            who: p,
+            pts: state.scores[i],
+            active: !sum.done && who === i,
+            tint: LANE_COLORS[i],
+          }))}
+          onPick=${sum.done ? null : (i) => setWho(i)}
+        />`}
     ${!sum.done
       ? html`<div class="card" style="border-color:${LANE_COLORS[who]}">
           <h2 style="color:${LANE_COLORS[who]}">Peg for ${state.players[who]}</h2>

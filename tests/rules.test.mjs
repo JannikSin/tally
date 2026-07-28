@@ -395,6 +395,81 @@ test("mahjong totals and east rotation", () => {
   assert.deepEqual(s.totals, [14, 22, -18, -18]);
 });
 
+test("sheepshead dealer rotates and drives sit-outs", () => {
+  assert.deepEqual(sheep.autoSitters(5, 2), []);
+  assert.deepEqual(sheep.autoSitters(6, 2), [2]);
+  assert.deepEqual(sheep.autoSitters(7, 6), [6, 0]);
+  let s = sheep.init({ players: ["P1", "P2", "P3", "P4", "P5", "P6"] });
+  assert.equal(s.dealer, 0);
+  s = sheep.reduce(s, { type: "hand", active: [1, 2, 3, 4, 5], picker: 1, partner: 2, result: "win", crack: 1 }).state;
+  assert.equal(s.dealer, 1); // deal passed left
+  s = sheep.reduce(s, { type: "redeal" }).state;
+  assert.equal(s.dealer, 1); // same dealer redeals after all-pass
+  s = sheep.reduce(s, { type: "leaster", active: [0, 2, 3, 4, 5], winner: 0 }).state;
+  assert.equal(s.dealer, 2);
+  s = sheep.reduce(s, { type: "setDealer", dealer: 5 }).state;
+  assert.equal(s.dealer, 5);
+});
+
+test("games emit structured results for the rivalry ledger", () => {
+  let e = euchre.init({ teams: ["We", "They"], target: 6 });
+  e = euchre.reduce(e, { type: "hand", makers: 1, result: "euchred" }).state; // We euchre them
+  e = euchre.reduce(e, { type: "hand", makers: 0, result: "loner" }).state;
+  const er = euchre.summary(e).result;
+  assert.equal(er.winner, "We");
+  assert.deepEqual(er.participants, ["We", "They"]);
+  assert.equal(er.stats.Euchres.We, 1);
+  assert.equal(er.stats.Loners.We, 1);
+
+  let g = gin.init({ players: ["P1", "P2"] });
+  g = gin.reduce(g, { type: "hand", winner: 1, kind: "undercut", points: 3 }).state;
+  g = gin.reduce(g, { type: "hand", winner: 0, kind: "biggin", points: 60 }).state;
+  const gr = gin.summary(g).result;
+  assert.equal(gr.stats.Undercuts.P2, 1);
+  assert.equal(gr.stats.Gins.P1, 1);
+  assert.equal(gr.winner, "P1"); // 110 >= 100
+
+  let c = crib.init({ players: ["P1", "P2"] });
+  c = crib.reduce(c, { type: "peg", player: 0, pts: 121 }).state;
+  const cr = crib.summary(c).result;
+  assert.equal(cr.winner, "P1");
+  assert.deepEqual(cr.stats["Double skunks"], { P1: 1 });
+});
+
+// ---------- rivalry aggregation ----------
+import * as riv from "../app/rivalry.data.js";
+
+test("rivalry aggregation: records, streaks, badges, milestones", () => {
+  const entry = (winner, stats = {}) => ({
+    date: 1,
+    line: "x",
+    result: { participants: ["P1", "P2"], winner, stats },
+  });
+  const history = {
+    euchre: [
+      entry("P1", { Euchres: { P1: 2 } }),
+      entry("P2"),
+      entry(null, { Euchres: { P1: 5 } }), // unfinished: stats count, the game doesn't
+      entry("P1", { Euchres: { P1: 1 } }),
+      entry("P1"),
+      entry("P1"),
+    ],
+    gin: [{ date: 2, line: "no result entry kept out" }],
+  };
+  const ms = riv.aggregate(history, { euchre: "Euchre" });
+  assert.equal(ms.length, 1);
+  const m = ms[0];
+  assert.equal(m.games, 5); // the null-winner entry didn't count
+  assert.deepEqual(m.wins, { P1: 4, P2: 1 });
+  assert.deepEqual(m.streak, { who: "P1", n: 3 });
+  assert.equal(m.stats.Euchres.P1, 8); // but its stats did
+  assert.equal(riv.edge(m, "P2").kind, "nemesis");
+  assert.equal(riv.edge(m, "P1").kind, "victim");
+  assert.deepEqual(riv.milestoneFor(10), { hit: 10 });
+  assert.deepEqual(riv.milestoneFor(24), { next: 25 });
+  assert.equal(riv.milestoneFor(23), null);
+});
+
 // ---------- store quarantine ----------
 test("store survives corrupt and truncated data", async () => {
   const mem = new Map();

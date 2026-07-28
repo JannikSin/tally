@@ -2,6 +2,7 @@ import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { html } from "htm/preact";
 import { store } from "./store.js";
+import { Rivalries } from "./rivalry.js";
 import * as euchre from "./games/euchre.js";
 import * as ohhell from "./games/ohhell.js";
 import * as gin from "./games/gin.js";
@@ -45,6 +46,13 @@ function Home() {
             : html`<span class="hint">${g.meta.hint}</span>`}
         </button>`;
       })}
+      <button class="tile" style="grid-column:1/3;min-height:74px;flex-direction:row;align-items:center" onClick=${() => (location.hash = "rivalries")}>
+        <span class="glyph" style="color:var(--loss);font-weight:700">⚔</span>
+        <span>
+          <span class="name" style="display:block">Rivalries</span>
+          <span class="hint">Lifetime records between the same names, kept automatically.</span>
+        </span>
+      </button>
     </div>
   </div>`;
 }
@@ -115,6 +123,21 @@ function GameScreen({ game, bump }) {
   const [confirmEnd, setConfirmEnd] = useState(false);
   useEffect(() => setConfirmEnd(false), [session]);
 
+  // A scorekeeper propped on the table must not sleep mid-game.
+  useEffect(() => {
+    if (!session || !navigator.wakeLock) return;
+    let lock = null;
+    const acquire = () =>
+      navigator.wakeLock.request("screen").then((l) => { lock = l; }).catch(() => {});
+    const onVis = () => { if (document.visibilityState === "visible") acquire(); };
+    acquire();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      if (lock) lock.release().catch(() => {});
+    };
+  }, [!!session]);
+
   const dispatch = (action) => {
     const s = store.session(meta.id);
     const r = rules.reduce(s.state, action);
@@ -132,14 +155,14 @@ function GameScreen({ game, bump }) {
     const sum = rules.summary(s.state);
     // open-ended games (sheepshead, mahjong) are never "done"; their line IS the settlement
     const openEnded = !("done" in sum) || meta.id === "sheepshead" || meta.id === "mahjong";
-    store.end(meta.id, sum.done || openEnded ? sum.line : `${sum.line} (unfinished)`);
+    store.end(meta.id, sum.done || openEnded ? sum.line : `${sum.line} (unfinished)`, sum.result);
     bump();
   };
   const rematch = () => {
     const s = store.session(meta.id);
     const cfg = s.config;
     const sum = rules.summary(s.state);
-    store.end(meta.id, sum.line);
+    store.end(meta.id, sum.line, sum.result);
     store.start(meta.id, cfg, rules.init(cfg));
     bump();
   };
@@ -181,6 +204,9 @@ function App() {
   const bump = () => setTick((t) => t + 1);
   useEffect(() => scrollTo(0, 0), [hash]);
   if (hash === "settings") return html`<${Settings} />`;
+  if (hash === "rivalries") {
+    return html`<${Rivalries} gameMeta=${Object.fromEntries(GAMES.map((g) => [g.meta.id, g.meta.name]))} />`;
+  }
   const game = GAMES.find((g) => g.meta.id === hash);
   if (game) return html`<${GameScreen} game=${game} bump=${bump} key=${hash} />`;
   return html`<${Home} />`;

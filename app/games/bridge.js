@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./bridge.rules.js";
-import { LogList, OverBanner, Seg } from "../ui.js";
+import { BigScore, LogList, OverBanner } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
@@ -77,13 +77,23 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   const overMax = ready ? 7 - level : 0;
   const downMax = ready ? level + 6 : 0;
 
+  const t = rules.totals(state);
   return html`<div>
+    <${BigScore}
+      entries=${[0, 1].map((i) => ({
+        who: state.teams[i] + (state.vul[i] ? " · VUL" : ""),
+        pts: t[i],
+        lead: t[i] !== t[1 - i] && t[i] > t[1 - i],
+        picked: !sum.done && declarer === i,
+        sub: !sum.done && declarer === i ? "declaring" : `games ${state.games[i]}`,
+      }))}
+      onPick=${sum.done ? null : (i) => setDeclarer(i)}
+    />
     ${sum.done ? html`<${OverBanner} line=${sum.line} onRematch=${onRematch} onDone=${onDone} />` : null}
     <${Pad} state=${state} />
     ${!sum.done
       ? html`<div class="card">
-          <h2>Contract</h2>
-          <${Seg} options=${[0, 1].map((i) => ({ value: i, label: state.teams[i] + (state.vul[i] ? " (vul)" : "") }))} value=${declarer} onChange=${setDeclarer} />
+          <h2>Contract by ${state.teams[declarer]} (tap the scoreboard to switch)</h2>
           <div class="btngrid c4" style="margin-top:10px">
             ${[1, 2, 3, 4, 5, 6, 7].map(
               (l) => html`<button type="button" class=${l === level ? "primary" : ""} onClick=${() => setLevel(l)}>${l}</button>`,

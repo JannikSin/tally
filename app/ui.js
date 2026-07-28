@@ -3,6 +3,60 @@ import { html } from "htm/preact";
 // Shared widgets. Games render only their entry surface; the shell owns
 // the top bar and undo.
 
+// Big two-side scoreboard: half-screen color blocks, score at heroic scale.
+// Scores stay pinned and huge no matter what's being entered below.
+// entries: [{who, pts, sub?, lead?, picked?}] (exactly 2). onPick(i) makes
+// each half a tap target for the game's most common selection.
+export function BigScore({ entries, onPick }) {
+  return html`<div class="bigscore">
+    ${entries.map((e, i) => {
+      const cls = `half side-${i === 0 ? "a" : "b"}${e.lead ? " lead" : ""}${e.picked ? " picked" : ""}`;
+      const body = html`
+        <div class="who">${e.who}</div>
+        <div class=${"val bump" + (typeof e.pts === "number" && e.pts < 0 ? " neg" : "")} key=${e.pts}>${e.pts}</div>
+        <div class="sub">${e.sub || ""}</div>`;
+      return onPick
+        ? html`<button type="button" class=${cls} onClick=${() => onPick(i)}>${body}</button>`
+        : html`<div class=${cls}>${body}</div>`;
+    })}
+  </div>`;
+}
+
+// Horizontal N-player score band: one column per player, ACROSS the screen,
+// sticky under the top bar. cells: [{who, pts, dealer?, sitting?, active?, tint?}].
+export function ScoreBand({ cells, onPick, signed = false }) {
+  return html`<div class="scoreband">
+    ${cells.map((c, i) => {
+      const cls = `cell${c.active ? " active" : ""}${c.sitting ? " sitting" : ""}`;
+      const tot =
+        "tot bump" +
+        (signed && typeof c.pts === "number" ? (c.pts > 0 ? " pos" : c.pts < 0 ? " neg" : "") : "");
+      const body = html`
+        ${c.dealer ? html`<span class="dealer-dot" title="dealer"></span>` : null}
+        <div class="nm" style=${c.tint ? `color:${c.tint}` : ""}>${c.who}</div>
+        <div class=${tot} key=${c.pts} style=${c.tint ? `color:${c.tint}` : ""}>${signed && typeof c.pts === "number" && c.pts > 0 ? "+" + c.pts : c.pts}</div>`;
+      return onPick
+        ? html`<button type="button" class=${cls} onClick=${() => onPick(i)}>${body}</button>`
+        : html`<div class=${cls}>${body}</div>`;
+    })}
+  </div>`;
+}
+
+const CONFETTI_COLORS = ["#4d9fff", "#e5b04a", "#7fd49a", "#e9f1fb", "#e5674a"];
+
+export function Confetti() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return null;
+  return html`<div class="confetti">
+    ${Array.from({ length: 48 }, (_, i) => {
+      // deterministic scatter, no Math.random needed
+      const left = (i * 61) % 100;
+      const delay = ((i * 37) % 20) / 14;
+      const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      return html`<i style=${`left:${left}%;animation-delay:${delay}s;background:${color}`}></i>`;
+    })}
+  </div>`;
+}
+
 export function Seg({ options, value, onChange }) {
   return html`<div class="seg">
     ${options.map(
@@ -89,8 +143,10 @@ export function LogList({ lines, empty = "No hands scored yet." }) {
 }
 
 // Game-over banner with rematch / finish, shared by every game.
+// Confetti fires here and only here: celebration is reserved for the win.
 export function OverBanner({ line, onRematch, onDone }) {
   return html`<div class="banner fade-in">
+    <${Confetti} />
     <div class="big">${line}</div>
     <div class="row" style="margin-top:12px;justify-content:center">
       <button type="button" onClick=${onRematch}>Rematch</button>

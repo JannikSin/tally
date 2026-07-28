@@ -36,6 +36,7 @@ export function init(config) {
     phase: "bid",
     bids: null,
     totals: Array(config.players.length).fill(0),
+    exacts: Array(config.players.length).fill(0), // rounds where the bid hit exactly
     over: false,
   };
 }
@@ -64,6 +65,9 @@ export function reduce(state, action) {
   if (action.type === "tricks" && state.phase === "tricks") {
     const pts = scoreRound(state.scoring, state.bids, action.tricks);
     const totals = state.totals.map((t, i) => t + pts[i]);
+    const exacts = (state.exacts || state.players.map(() => 0)).map(
+      (e, i) => e + (action.tricks[i] === state.bids[i] ? 1 : 0),
+    );
     const cards = state.seq[state.round];
     const line = `${cards} card${cards === 1 ? "" : "s"}: ${state.players
       .map((p, i) => `${p} ${state.bids[i]}/${action.tricks[i]}${pts[i] ? ` +${pts[i]}` : ""}`)
@@ -71,7 +75,7 @@ export function reduce(state, action) {
     const round = state.round + 1;
     const over = round >= state.seq.length;
     return {
-      state: { ...state, totals, round, phase: "bid", bids: null, over },
+      state: { ...state, totals, exacts, round, phase: "bid", bids: null, over },
       line,
     };
   }
@@ -81,11 +85,20 @@ export function reduce(state, action) {
 export function summary(state) {
   const best = Math.max(...state.totals);
   const winner = state.players[state.totals.indexOf(best)];
+  const exacts = state.exacts || state.players.map(() => 0);
+  const result = {
+    participants: state.players.slice(),
+    winner: state.over ? winner : null,
+    stats: {
+      "Exact bids": Object.fromEntries(state.players.map((p, i) => [p, exacts[i]])),
+    },
+  };
   if (state.over) {
-    return { done: true, line: `${winner} wins with ${best}` };
+    return { done: true, line: `${winner} wins with ${best}`, result };
   }
   return {
     done: false,
     line: `Round ${state.round + 1}/${state.seq.length} · ${winner} leads ${best}`,
+    result,
   };
 }

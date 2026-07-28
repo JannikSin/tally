@@ -34,12 +34,22 @@ export const RESULTS = [
 
 export function init(config) {
   return {
-    players: config.players,
+    players: config.players, // seating order; the deal passes left through this array
     totals: Array(config.players.length).fill(0),
     hands: 0,
+    dealer: 0,
     leasterRule: config.leasterRule || "fewest", // "fewest" | "trick" | "jackOfDiamonds" | "doubler"
     pendingDouble: 1, // set by a "doubler" redeal; consumed by the next hand/leaster
+    stats: { picks: {}, pickWins: {}, schwarzes: {} }, // rivalry counters keyed by player name
   };
+}
+
+// House convention: hands play at most five-handed; the dealer sits out their
+// own deal in a 6-hand game, dealer plus the next seat in a 7-hand game.
+export function autoSitters(playerCount, dealer) {
+  if (playerCount <= 5) return [];
+  if (playerCount === 6) return [dealer];
+  return [dealer, (dealer + 1) % playerCount];
 }
 
 // deltas over the active players of one hand, in units; zero-sum by construction.
@@ -65,8 +75,13 @@ export function handDeltas(activeCount, pickerIdx, partnerIdx, resultKey, crack 
 }
 
 export function reduce(state, action) {
+  if (action.type === "setDealer") {
+    // manual correction when the table's deal got out of sync with the app
+    return { state: { ...state, dealer: action.dealer }, line: null };
+  }
   if (action.type === "redeal") {
-    // all passed under the "doubler" house rule: void hand, next hand's stakes double
+    // all passed under the "doubler" house rule: void hand, SAME dealer redeals,
+    // next hand's stakes double
     const pendingDouble = (state.pendingDouble || 1) * 2;
     return { state: { ...state, pendingDouble }, line: `Redeal, all passed: next hand pays ×${pendingDouble}` };
   }
@@ -83,8 +98,14 @@ export function reduce(state, action) {
     );
     const totals = state.totals.slice();
     active.forEach((p, i) => { totals[p] += deltas[i]; });
+    const stats = structuredClone(state.stats || { picks: {}, pickWins: {}, schwarzes: {} });
+    const pname = state.players[picker];
+    stats.picks[pname] = (stats.picks[pname] || 0) + 1;
+    if (r.win) stats.pickWins[pname] = (stats.pickWins[pname] || 0) + 1;
+    if (result === "winSchwarz") stats.schwarzes[pname] = (stats.schwarzes[pname] || 0) + 1;
     const line = `${state.players[picker]}${partner != null && partner !== picker ? ` + ${state.players[partner]}` : " alone"}: ${r.label.toLowerCase()}${crack > 1 ? ` ×${crack}` : ""}${doubler > 1 ? ` (doubler ×${doubler})` : ""}`;
-    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1 }, line };
+    const dealer = ((state.dealer || 0) + 1) % state.players.length;
+    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1, dealer, stats }, line };
   }
   if (action.type === "leaster") {
     const { active, winner, noWinner } = action;
@@ -97,20 +118,27 @@ export function reduce(state, action) {
       active.forEach((p) => { totals[p] += (p === winner ? active.length - 1 : -1) * doubler; });
       line = `Leaster: ${state.players[winner]} takes it${doubler > 1 ? ` (doubler ×${doubler})` : ""}`;
     }
-    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1 }, line };
+    const dealer = ((state.dealer || 0) + 1) % state.players.length;
+    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1, dealer }, line };
   }
   return { state, line: null };
 }
 
 export function summary(state) {
   // full settlement in the line: this is what history records when the session ends
-  const pairs = state.players
+  const ranked = state.players
     .map((p, i) => ({ p, t: state.totals[i] }))
-    .sort((a, b) => b.t - a.t)
-    .map((x) => `${x.p} ${x.t > 0 ? "+" : ""}${x.t}`)
-    .join(" · ");
+    .sort((a, b) => b.t - a.t);
+  const pairs = ranked.map((x) => `${x.p} ${x.t > 0 ? "+" : ""}${x.t}`).join(" · ");
+  const st = state.stats || { picks: {}, pickWins: {}, schwarzes: {} };
   return {
     done: false,
     line: `${state.hands} hand${state.hands === 1 ? "" : "s"}: ${pairs}`,
+    result: {
+      participants: state.players.slice(),
+      // session winner = biggest money; a tie at the top records no winner
+      winner: ranked.length > 1 && ranked[0].t > ranked[1].t ? ranked[0].p : null,
+      stats: { Picks: st.picks, "Picks won": st.pickWins, Schwarzes: st.schwarzes },
+    },
   };
 }

@@ -45,13 +45,17 @@ export function reduce(state, action) {
 
 export function summary(state) {
   // full settlement in the line: this is what history records when the session ends
-  const pairs = state.players
+  const ranked = state.players
     .map((p, i) => ({ p, t: state.totals[i] }))
-    .sort((a, b) => b.t - a.t)
-    .map((x) => `${x.p} ${x.t > 0 ? "+" : ""}${x.t}`)
-    .join(" · ");
+    .sort((a, b) => b.t - a.t);
+  const pairs = ranked.map((x) => `${x.p} ${x.t > 0 ? "+" : ""}${x.t}`).join(" · ");
   return {
     done: false,
     line: `${state.round} hand${state.round === 1 ? "" : "s"}: ${pairs}`,
+    result: {
+      participants: state.players.slice(),
+      winner: ranked.length > 1 && ranked[0].t > ranked[1].t ? ranked[0].p : null,
+      stats: {},
+    },
   };
 }

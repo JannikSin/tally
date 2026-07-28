@@ -1,7 +1,7 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./sheepshead.rules.js";
-import { PlayerNames, LogList, Seg } from "../ui.js";
+import { PlayerNames, ScoreBand, LogList, Seg } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
@@ -61,45 +61,54 @@ function Chip({ on, dim, onClick, children }) {
 export function Play({ state, log, dispatch, onDone }) {
   const n = state.players.length;
   const seats = n - Math.min(n, 5);
-  const [sitting, setSitting] = useState([]);
+  const dealer = state.dealer || 0;
+  // sitters follow the deal automatically; tapping the chips overrides for one hand
+  const [sitOverride, setSitOverride] = useState(null);
   const [picker, setPicker] = useState(null);
   const [partner, setPartner] = useState(null); // null = alone
   const [crack, setCrack] = useState(1);
   const [leaster, setLeaster] = useState(false);
+  useEffect(() => setSitOverride(null), [dealer, n]);
+  const sitting = sitOverride ?? rules.autoSitters(n, dealer);
   const active = state.players.map((_, i) => i).filter((i) => !sitting.includes(i));
   const okSitters = sitting.length === seats;
   const leasterRule = state.leasterRule || "fewest"; // old sessions predate this field
   const pendingDouble = state.pendingDouble || 1;
-  const reset = () => { setPicker(null); setPartner(null); setCrack(1); setLeaster(false); setSitting([]); };
+  const reset = () => { setPicker(null); setPartner(null); setCrack(1); setLeaster(false); setSitOverride(null); };
   const partnerAllowed = active.length >= 4; // called-ace works 4- and 5-handed
 
   return html`<div>
-    <div class="card">
-      <h2>Standings</h2>
-      <table class="ledger">
-        <tbody>
-          ${state.players
-            .map((p, i) => ({ p, t: state.totals[i] }))
-            .sort((a, b) => b.t - a.t)
-            .map(
-              (x) => html`<tr>
-                <td style="font-family:var(--body)">${x.p}</td>
-                <td class=${x.t < 0 ? "neg" : x.t > 0 ? "pos" : ""}>${x.t > 0 ? "+" : ""}${x.t}</td>
-              </tr>`,
-            )}
-        </tbody>
-      </table>
-    </div>
+    <${ScoreBand}
+      signed
+      cells=${state.players.map((p, i) => ({
+        who: p,
+        pts: state.totals[i],
+        dealer: i === dealer,
+        sitting: seats > 0 && sitting.includes(i),
+      }))}
+    />
     <div class="card">
       <h2>Score a hand</h2>
+      <div class="row wrap" style="margin-bottom:8px">
+        <button type="button" class="ghost" style="font-size:13px;padding:4px 10px;min-height:36px"
+          onClick=${() => dispatch({ type: "setDealer", dealer: (dealer + 1) % n })}
+        >Dealer: ${state.players[dealer]} · tap if wrong</button>
+      </div>
       ${pendingDouble > 1 ? html`<p class="hint-line">Doubler active from a redeal: this hand pays ×${pendingDouble}.</p>` : null}
       ${seats > 0
-        ? html`<p class="hint-line">Sitting out (${sitting.length}/${seats}):</p>
+        ? html`<p class="hint-line">Sitting out this hand (dealer sits their own deal${n === 7 ? ", plus the next seat" : ""}; tap to override):</p>
             <div class="row wrap" style="margin-bottom:10px">
               ${state.players.map(
                 (p, i) => html`<${Chip}
                   on=${sitting.includes(i)}
-                  onClick=${() => setSitting(sitting.includes(i) ? sitting.filter((x) => x !== i) : sitting.length < seats ? [...sitting, i] : sitting)}
+                  onClick=${() => {
+                    const cur = sitting.includes(i)
+                      ? sitting.filter((x) => x !== i)
+                      : sitting.length < seats
+                        ? [...sitting, i]
+                        : sitting;
+                    setSitOverride(cur);
+                  }}
                 >${p}<//>`,
               )}
             </div>`

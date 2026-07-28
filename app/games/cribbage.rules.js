@@ -42,19 +42,28 @@ export function skunkLabel(loserScore) {
 }
 
 export function summary(state) {
+  const result = {
+    participants: state.players.slice(),
+    winner: state.over ? state.players[state.winner] : null,
+    stats: {},
+  };
   if (state.over) {
     const losers = state.players
       .map((p, i) => ({ p, s: state.scores[i], i }))
       .filter((x) => x.i !== state.winner);
     const worst = Math.min(...losers.map((x) => x.s));
     const skunk = skunkLabel(worst);
+    if (skunk === "skunk") result.stats.Skunks = { [state.players[state.winner]]: 1 };
+    if (skunk === "double skunk") result.stats["Double skunks"] = { [state.players[state.winner]]: 1 };
     return {
       done: true,
       line: `${state.players[state.winner]} wins 121–${losers.map((x) => x.s).join("–")}${skunk ? ` (${skunk})` : ""}`,
+      result,
     };
   }
   return {
     done: false,
     line: state.players.map((p, i) => `${p} ${state.scores[i]}`).join(" · "),
+    result,
   };
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./ohhell.rules.js";
-import { PlayerNames, LogList, OverBanner, Seg, Stepper } from "../ui.js";
+import { PlayerNames, ScoreBand, LogList, OverBanner, Seg, Stepper } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
@@ -83,19 +83,14 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   const best = Math.max(...state.totals);
 
   return html`<div>
-    <div class="card">
-      <h2>Totals</h2>
-      <table class="ledger">
-        <tbody>
-          ${state.players.map(
-            (p, i) => html`<tr>
-              <td style="font-family:var(--body)">${p}${i === dealer && !state.over ? html`<span class="warn"> · deals</span>` : null}</td>
-              <td class=${state.totals[i] === best && best > 0 ? "pos" : ""}>${state.totals[i]}</td>
-            </tr>`,
-          )}
-        </tbody>
-      </table>
-    </div>
+    <${ScoreBand}
+      cells=${state.players.map((p, i) => ({
+        who: p,
+        pts: state.totals[i],
+        dealer: i === dealer && !state.over,
+        tint: state.totals[i] === best && best > 0 ? "var(--brass)" : null,
+      }))}
+    />
     ${sum.done
       ? html`<${OverBanner} line=${sum.line} onRematch=${onRematch} onDone=${onDone} />`
       : html`<div class="card">

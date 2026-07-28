@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./euchre.rules.js";
-import { ScoreBar, LogList, OverBanner, Seg } from "../ui.js";
+import { BigScore, LogList, OverBanner } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
@@ -45,18 +45,20 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
   const sum = rules.summary(state);
   const lead = state.score[0] === state.score[1] ? -1 : state.score[0] > state.score[1] ? 0 : 1;
   return html`<div>
-    <${ScoreBar}
-      entries=${[0, 1].map((i) => ({ who: state.teams[i], pts: state.score[i], lead: i === lead }))}
+    <${BigScore}
+      entries=${[0, 1].map((i) => ({
+        who: state.teams[i],
+        pts: state.score[i],
+        lead: i === lead,
+        picked: makers === i,
+        sub: makers === i ? "called trump" : `first to ${state.target}`,
+      }))}
+      onPick=${sum.done ? null : (i) => setMakers(i)}
     />
     ${sum.done
       ? html`<${OverBanner} line=${sum.line} onRematch=${onRematch} onDone=${onDone} />`
       : html`<div class="card">
-          <h2>Who called trump?</h2>
-          <${Seg}
-            options=${[0, 1].map((i) => ({ value: i, label: state.teams[i] }))}
-            value=${makers}
-            onChange=${setMakers}
-          />
+          <h2>${makers == null ? "Tap the team that called trump" : `${state.teams[makers]} called trump`}</h2>
           ${makers != null
             ? html`
                 <div class="row" style="margin-top:10px">
@@ -72,7 +74,7 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
                     </button>`,
                   )}
                 </div>`
-            : html`<p class="hint-line">Pick the calling team to score the hand. All passed twice? Just redeal.</p>`}
+            : html`<p class="hint-line">Tap a team's half of the scoreboard above. All passed twice? Just redeal.</p>`}
         </div>`}
     <div class="card"><h2>Hands</h2><${LogList} lines=${log} /></div>
   </div>`;

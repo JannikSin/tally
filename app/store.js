@@ -83,10 +83,14 @@ export const store = {
     save();
   },
 
-  end(gameId, line) {
+  // result (optional) is the structured outcome from rules.summary().result:
+  // { participants, winner, stats } — the raw material for lifetime rivalries.
+  end(gameId, line, result) {
     if (line) {
-      (db.history[gameId] ||= []).push({ date: Date.now(), line });
-      if (db.history[gameId].length > 50) db.history[gameId].shift();
+      const entry = { date: Date.now(), line };
+      if (result && typeof result === "object") entry.result = result;
+      (db.history[gameId] ||= []).push(entry);
+      if (db.history[gameId].length > 200) db.history[gameId].shift();
     }
     delete db.games[gameId];
     save();
@@ -94,6 +98,10 @@ export const store = {
 
   history(gameId) {
     return db.history[gameId] || [];
+  },
+
+  historyAll() {
+    return db.history;
   },
 
   roster() {
