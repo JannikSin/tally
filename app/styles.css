@@ -380,6 +380,23 @@ input[type="text"], input[type="number"] {
 }
 .sheet .rcell:last-child { border-right: 0; }
 .sheet .rcell.sitting { opacity: 0.3; }
+.sheet .rcell { position: relative; }
+.sheet .rcell .corner {
+  position: absolute;
+  top: 1px;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--chalk-dim);
+  line-height: 1;
+}
+.sheet .rcell .corner.tr { right: 3px; }
+.sheet .rcell .corner.tl { left: 3px; color: var(--brass); }
+.sheet .rcell.foots, .sheet .hcell.foots {
+  min-width: 44px;
+  color: var(--chalk-dim);
+  background: color-mix(in srgb, var(--ink) 55%, var(--felt));
+}
+.sheet .hcell.foots .tot { font-size: 16px; font-weight: 600; color: var(--chalk-dim); }
 .sheet .rcell .mark { font-size: 9.5px; font-weight: 700; letter-spacing: 0.3px; display: block; line-height: 1.1; }
 .sheet .rcell .mark.picker { color: var(--brass); }
 .sheet .rcell .mark.partner { color: var(--sky); }

@@ -13,6 +13,8 @@
 //   "jackOfDiamonds" — whoever takes the jack of diamonds wins outright
 //   "doubler" — no leaster at all: redeal, next hand's stakes double (stacks
 //     if it happens again) via state.pendingDouble, consumed by the next hand/leaster
+//   "forcedPick" — no leasters ever: the dealer must pick it up; a forced
+//     dealer-pick loss does not double on the bump
 // crack: x2, crack-and-recrack: x4 (the crack multiplier stacks on the result,
 // and on any pending doubler).
 
@@ -65,7 +67,9 @@ export function autoSitters(playerCount, dealer) {
 // redeal doubler and the automatic bump.
 export function previewDeltas(state, active, picker, partner, resultKey, doubleMult = 1) {
   const r = RESULTS.find((x) => x.key === resultKey);
-  const bump = !r.win && state.bumpDouble !== false ? 2 : 1;
+  // forced pick: when the dealer had to pick it up, a loss does NOT bump
+  const forced = state.leasterRule === "forcedPick" && picker === (state.dealer || 0);
+  const bump = !r.win && state.bumpDouble !== false && !forced ? 2 : 1;
   const deltas = handDeltas(
     active.length,
     active.indexOf(picker),
@@ -125,7 +129,8 @@ export function reduce(state, action) {
     stats.picks[pname] = (stats.picks[pname] || 0) + 1;
     if (r.win) stats.pickWins[pname] = (stats.pickWins[pname] || 0) + 1;
     if (result === "winSchwarz") stats.schwarzes[pname] = (stats.schwarzes[pname] || 0) + 1;
-    const bumped = !r.win && state.bumpDouble !== false;
+    const forced = state.leasterRule === "forcedPick" && picker === (state.dealer || 0);
+    const bumped = !r.win && state.bumpDouble !== false && !forced;
     const alone = partner == null || partner === picker;
     const line = `${state.players[picker]}${alone ? " alone" : ` + ${state.players[partner]}`}: ${r.label.toLowerCase()}${bumped ? " · bump ×2" : ""}${doubler > 1 ? ` · doubler ×${doubler}` : ""}`;
     const sitters = state.players.map((_, i) => i).filter((i) => !active.includes(i));

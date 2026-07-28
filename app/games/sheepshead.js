@@ -11,6 +11,7 @@ const LEASTER_RULES = [
   { value: "trick", label: "Fewest points, first trick breaks tie" },
   { value: "jackOfDiamonds", label: "Jack of diamonds takes it" },
   { value: "doubler", label: "No leaster — redeal, next hand doubles" },
+  { value: "forcedPick", label: "Forced pick — dealer must pick, no leasters" },
 ];
 
 export function Setup({ onStart, roster, history }) {
@@ -112,26 +113,37 @@ export function Play({ state, dispatch, onDone, onUndo, canUndo }) {
     else onUndo();
   };
 
+  // foots: each hand's positive-side sum (the spread); the book "foots" when
+  // plus and minus cancel to zero
+  const spreadOf = (deltas) => deltas.reduce((a, d) => a + (d > 0 ? d : 0), 0);
+  const totalsFoot = state.totals.reduce((a, t) => a + t, 0) === 0;
+  const totalsSpread = spreadOf(state.totals);
+
   const toggle = "min-height:52px;font-weight:600";
   return html`<div>
     <div class="sheet-wrap" ref=${sheetRef}>
-      <div class="sheet" style=${`grid-template-columns: repeat(${n}, minmax(64px, 1fr))`}>
-        ${rows.map((r) => html`
-          ${state.players.map((_, i) => {
-            const sits = r.sitters.includes(i);
-            const t = r.totals[i];
-            const aloneRow = r.picker != null && r.picker === r.partner;
-            return html`<div class=${"rcell" + (sits ? " sitting" : "")}>
-              ${t > 0 ? "+" + t : t}
-              ${r.picker === i
-                ? html`<span class="mark picker">${r.result === "leaster" ? "LSTR" : aloneRow ? "P·A" : "P"}${r.doubler > 1 ? `·×${r.doubler}` : r.bumped ? "·×2" : ""}</span>`
-                : r.partner === i
-                  ? html`<span class="mark partner">Pa</span>`
-                  : r.dealer === i
-                    ? html`<span class="mark dealer">D</span>`
+      <div class="sheet" style=${`grid-template-columns: repeat(${n}, minmax(64px, 1fr)) 44px`}>
+        ${rows.map((r, ri) => {
+          const prev = ri > 0 ? rows[ri - 1].totals : Array(n).fill(0);
+          const spread = spreadOf(r.totals.map((t, i) => t - prev[i]));
+          return html`
+            ${state.players.map((_, i) => {
+              const sits = r.sitters.includes(i);
+              const t = r.totals[i];
+              const aloneRow = r.picker != null && r.picker === r.partner;
+              return html`<div class=${"rcell" + (sits ? " sitting" : "")}>
+                ${i === 0 && r.doubler > 1 ? html`<span class="corner tl">×${r.doubler}</span>` : null}
+                ${r.dealer === i ? html`<span class="corner tr">D</span>` : null}
+                ${t > 0 ? "+" + t : t}
+                ${r.picker === i
+                  ? html`<span class="mark picker">${r.result === "leaster" ? "LSTR" : aloneRow ? "P·A" : "P"}</span>`
+                  : r.partner === i
+                    ? html`<span class="mark partner">Pa</span>`
                     : null}
-            </div>`;
-          })}`)}
+              </div>`;
+            })}
+            <div class="rcell foots">${spread}</div>`;
+        })}
         ${state.players.map((p, i) => {
           const sits = sitting.includes(i);
           const alone = picker === i && partner === i;
@@ -153,6 +165,12 @@ export function Play({ state, dispatch, onDone, onUndo, canUndo }) {
               : null}
           </div>`;
         })}
+        <div class="hcell foots">
+          <div class="nm">foots</div>
+          <div class="tot" style=${totalsFoot ? "" : "color:var(--loss)"}>${totalsFoot ? totalsSpread : "!"}</div>
+          <div class="role"> </div>
+          <div class="delta">${preview ? spreadOf(preview) : " "}</div>
+        </div>
       </div>
     </div>
     <div class="card">
@@ -166,13 +184,15 @@ export function Play({ state, dispatch, onDone, onUndo, canUndo }) {
           onClick=${() => { setMod(mod === "schneider" ? null : "schneider"); setLeaster(false); }}>No schneider</button>
         <button type="button" style=${toggle} class=${mod === "trick" ? "primary" : ""}
           onClick=${() => { setMod(mod === "trick" ? null : "trick"); setLeaster(false); }}>No trick</button>
-        <button type="button" style=${toggle} class=${leaster ? "primary" : ""}
-          onClick=${() => {
-            if (leasterRule === "doubler") { dispatch({ type: "redeal" }); clearSel(); return; }
-            const next = !leaster;
-            setLeaster(next);
-            if (next) { setWon(null); setMod(null); }
-          }}>${leasterRule === "doubler" ? "Redeal ×2" : "Leaster"}</button>
+        ${leasterRule !== "forcedPick"
+          ? html`<button type="button" style=${toggle} class=${leaster ? "primary" : ""}
+              onClick=${() => {
+                if (leasterRule === "doubler") { dispatch({ type: "redeal" }); clearSel(); return; }
+                const next = !leaster;
+                setLeaster(next);
+                if (next) { setWon(null); setMod(null); }
+              }}>${leasterRule === "doubler" ? "Redeal ×2" : "Leaster"}</button>`
+          : null}
         <button type="button" style=${toggle} class=${double > 1 ? "primary" : ""}
           onClick=${() => setDouble(double === 1 ? 2 : double === 2 ? 4 : double === 4 ? 6 : 1)}
         >Double${double > 1 ? ` ×${double}` : ""}</button>

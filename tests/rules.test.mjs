@@ -450,6 +450,17 @@ test("sheepshead alone (picker = partner) and the Double button multiplier", () 
   assert.deepEqual(l.state.totals, [-2, -2, -2, 8, -2]);
 });
 
+test("sheepshead forced pick: dealer's forced loss does not bump", () => {
+  const s = sheep.init({ players: ["P1", "P2", "P3", "P4", "P5"], leasterRule: "forcedPick" });
+  // dealer is seat 0; dealer forced to pick and loses: no bump
+  assert.deepEqual(sheep.previewDeltas(s, [0, 1, 2, 3, 4], 0, 1, "loss"), [-2, -1, 1, 1, 1]);
+  // a non-dealer picker still bumps
+  assert.deepEqual(sheep.previewDeltas(s, [0, 1, 2, 3, 4], 1, 2, "loss"), [2, -4, -2, 2, 2]);
+  const r = sheep.reduce(s, { type: "hand", active: [0, 1, 2, 3, 4], picker: 0, partner: 1, result: "loss" });
+  assert.deepEqual(r.state.totals, [-2, -1, 1, 1, 1]);
+  assert.equal(r.state.rows[0].bumped, false);
+});
+
 test("games emit structured results for the rivalry ledger", () => {
   let e = euchre.init({ teams: ["We", "They"], target: 6 });
   e = euchre.reduce(e, { type: "hand", makers: 1, result: "euchred" }).state; // We euchre them
