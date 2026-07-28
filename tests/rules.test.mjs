@@ -395,20 +395,42 @@ test("mahjong totals and east rotation", () => {
   assert.deepEqual(s.totals, [14, 22, -18, -18]);
 });
 
-test("sheepshead dealer rotates and drives sit-outs", () => {
+test("sheepshead dealer rotates and drives sit-outs, no exceptions", () => {
   assert.deepEqual(sheep.autoSitters(5, 2), []);
   assert.deepEqual(sheep.autoSitters(6, 2), [2]);
-  assert.deepEqual(sheep.autoSitters(7, 6), [6, 0]);
+  assert.deepEqual(sheep.autoSitters(7, 6), [6, 5]); // dealer + right of dealer
+  assert.deepEqual(sheep.autoSitters(7, 0), [0, 6]); // wraps
   let s = sheep.init({ players: ["P1", "P2", "P3", "P4", "P5", "P6"] });
-  assert.equal(s.dealer, 0);
-  s = sheep.reduce(s, { type: "hand", active: [1, 2, 3, 4, 5], picker: 1, partner: 2, result: "win", crack: 1 }).state;
-  assert.equal(s.dealer, 1); // deal passed left
+  assert.equal(s.dealer, 0); // deal starts at seat 1
+  s = sheep.reduce(s, { type: "hand", active: [1, 2, 3, 4, 5], picker: 1, partner: 2, result: "win" }).state;
+  assert.equal(s.dealer, 1);
   s = sheep.reduce(s, { type: "redeal" }).state;
   assert.equal(s.dealer, 1); // same dealer redeals after all-pass
   s = sheep.reduce(s, { type: "leaster", active: [0, 2, 3, 4, 5], winner: 0 }).state;
   assert.equal(s.dealer, 2);
-  s = sheep.reduce(s, { type: "setDealer", dealer: 5 }).state;
-  assert.equal(s.dealer, 5);
+});
+
+test("sheepshead double on the bump and the hand sheet rows", () => {
+  let s = sheep.init({ players: ["P1", "P2", "P3", "P4", "P5"] });
+  // loss pays double, always
+  const full = sheep.previewDeltas(s, [0, 1, 2, 3, 4], 0, 1, "loss");
+  assert.deepEqual(full, [-4, -2, 2, 2, 2]);
+  assert.equal(full.reduce((a, b) => a + b, 0), 0);
+  // no-schneider loss: x2 bucket x2 bump = x4
+  assert.deepEqual(sheep.previewDeltas(s, [0, 1, 2, 3, 4], 0, 1, "lossSchneider"), [-8, -4, 4, 4, 4]);
+  // wins stay single
+  assert.deepEqual(sheep.previewDeltas(s, [0, 1, 2, 3, 4], 0, 1, "win"), [2, 1, -1, -1, -1]);
+  s = sheep.reduce(s, { type: "hand", active: [0, 1, 2, 3, 4], picker: 0, partner: 1, result: "loss" }).state;
+  assert.deepEqual(s.totals, [-4, -2, 2, 2, 2]);
+  assert.equal(s.rows.length, 1);
+  assert.deepEqual(s.rows[0], {
+    totals: [-4, -2, 2, 2, 2], picker: 0, partner: 1, dealer: 0,
+    sitters: [], result: "loss", bumped: true, doubler: 1,
+  });
+  s = sheep.reduce(s, { type: "leaster", active: [0, 1, 2, 3, 4], winner: 2 }).state;
+  assert.equal(s.rows.length, 2);
+  assert.equal(s.rows[1].result, "leaster");
+  assert.equal(s.rows[1].dealer, 1);
 });
 
 test("games emit structured results for the rivalry ledger", () => {

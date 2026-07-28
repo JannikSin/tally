@@ -1,7 +1,7 @@
-import { useEffect, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./sheepshead.rules.js";
-import { PlayerNames, ScoreBand, LogList, Seg } from "../ui.js";
+import { PlayerNames, Seg } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
@@ -19,7 +19,7 @@ export function Setup({ onStart, roster, history }) {
   const [leasterRule, setLeasterRule] = useState("fewest");
   return html`<div>
     <div class="card">
-      <h2>Players</h2>
+      <h2>Players, in seating order</h2>
       <${Seg}
         options=${[3, 4, 5, 6, 7].map((n) => ({ value: n, label: String(n) }))}
         value=${count}
@@ -28,13 +28,13 @@ export function Setup({ onStart, roster, history }) {
       <div style="margin-top:12px">
         <${PlayerNames} count=${count} names=${names} onChange=${setNames} roster=${roster} />
       </div>
-      ${count > 5 ? html`<p class="hint-line">Hands play five-handed; pick who sits out each hand.</p>` : null}
+      <p class="hint-line">Seat 1 deals first; the deal rotates down the list.${count === 6 ? " The dealer sits out their own deal." : ""}${count === 7 ? " The dealer and the player to the dealer's right sit out." : ""} Losses pay double (bump), always.</p>
     </div>
     <div class="card">
       <h2>House rules</h2>
       <p class="hint-line">If everyone passes (leaster):</p>
       <div class="row wrap" style="margin-top:8px">
-        ${LEASTER_RULES.map((o) => html`<${Chip} on=${leasterRule === o.value} onClick=${() => setLeasterRule(o.value)}>${o.label}<//>`)}
+        ${LEASTER_RULES.map((o) => html`<button type="button" class=${leasterRule === o.value ? "primary" : ""} style="min-height:40px;padding:6px 12px;font-size:14px" onClick=${() => setLeasterRule(o.value)}>${o.label}</button>`)}
       </div>
     </div>
     <button
@@ -49,126 +49,143 @@ export function Setup({ onStart, roster, history }) {
   </div>`;
 }
 
-function Chip({ on, dim, onClick, children }) {
-  return html`<button
-    type="button"
-    class=${on ? "primary" : ""}
-    style=${`min-height:40px;padding:6px 12px;font-size:14px;${dim ? "opacity:0.4;" : ""}`}
-    onClick=${onClick}
-  >${children}</button>`;
-}
+const RESULT_LABEL = {
+  win: "Won", winSchneider: "Won, no schneider", winSchwarz: "Won, no trick",
+  loss: "Lost", lossSchneider: "Lost, no schneider", lossSchwarz: "Lost, no trick",
+  leaster: "Leaster",
+};
 
-export function Play({ state, log, dispatch, onDone }) {
+export function Play({ state, dispatch, onDone, onUndo, canUndo }) {
   const n = state.players.length;
-  const seats = n - Math.min(n, 5);
   const dealer = state.dealer || 0;
-  // sitters follow the deal automatically; tapping the chips overrides for one hand
-  const [sitOverride, setSitOverride] = useState(null);
-  const [picker, setPicker] = useState(null);
-  const [partner, setPartner] = useState(null); // null = alone
-  const [crack, setCrack] = useState(1);
-  const [leaster, setLeaster] = useState(false);
-  useEffect(() => setSitOverride(null), [dealer, n]);
-  const sitting = sitOverride ?? rules.autoSitters(n, dealer);
+  const sitting = rules.autoSitters(n, dealer); // no exceptions, no overrides
   const active = state.players.map((_, i) => i).filter((i) => !sitting.includes(i));
-  const okSitters = sitting.length === seats;
-  const leasterRule = state.leasterRule || "fewest"; // old sessions predate this field
+  const [picker, setPicker] = useState(null);
+  const [partner, setPartner] = useState(null);
+  const [outcome, setOutcome] = useState(null); // result key | "leaster"
+  const leasterRule = state.leasterRule || "fewest";
   const pendingDouble = state.pendingDouble || 1;
-  const reset = () => { setPicker(null); setPartner(null); setCrack(1); setLeaster(false); setSitOverride(null); };
-  const partnerAllowed = active.length >= 4; // called-ace works 4- and 5-handed
+  const rows = state.rows || [];
+  const clearSel = () => { setPicker(null); setPartner(null); setOutcome(null); };
+
+  // left half = picker, right half = partner; tap toggles, tapping another
+  // column steals the role; picker and partner can never be the same player
+  const tapPicker = (i) => {
+    if (sitting.includes(i)) return;
+    if (picker === i) setPicker(null);
+    else { setPicker(i); if (partner === i) setPartner(null); }
+  };
+  const tapPartner = (i) => {
+    if (sitting.includes(i)) return;
+    if (partner === i) setPartner(null);
+    else { setPartner(i); if (picker === i) setPicker(null); }
+  };
+
+  const isLeaster = outcome === "leaster";
+  const canScore =
+    outcome != null && picker != null && (isLeaster || partner != null);
+  const preview = canScore
+    ? isLeaster
+      ? rules.previewLeaster(state, active, picker)
+      : rules.previewDeltas(state, active, picker, partner, outcome)
+    : null;
+
+  const scoreHand = () => {
+    if (!canScore) return;
+    if (isLeaster) dispatch({ type: "leaster", active, winner: picker });
+    else dispatch({ type: "hand", active, picker, partner, result: outcome });
+    clearSel();
+  };
+  // one undo button for everything: selections unwind first, then scored hands
+  const undo = () => {
+    if (outcome != null) setOutcome(null);
+    else if (partner != null) setPartner(null);
+    else if (picker != null) setPicker(null);
+    else onUndo();
+  };
 
   return html`<div>
-    <${ScoreBand}
-      signed
-      cells=${state.players.map((p, i) => ({
-        who: p,
-        pts: state.totals[i],
-        dealer: i === dealer,
-        sitting: seats > 0 && sitting.includes(i),
-      }))}
-    />
+    <div class="sheet-wrap">
+      <div class="sheet" style=${`grid-template-columns: repeat(${n}, minmax(64px, 1fr))`}>
+        ${state.players.map((p, i) => {
+          const sits = sitting.includes(i);
+          const cls = `hcell${sits ? " sitting" : ""}${picker === i ? " is-picker" : ""}${partner === i ? " is-partner" : ""}`;
+          const t = state.totals[i];
+          return html`<div class=${cls}>
+            <div class="nm">${p}${i === dealer ? " ●" : ""}</div>
+            <div class=${"tot" + (t > 0 ? " pos" : t < 0 ? " neg" : "")}>${t > 0 ? "+" + t : t}</div>
+            <div class=${"role" + (picker === i ? " picker" : partner === i ? " partner" : "")}>
+              ${picker === i ? (isLeaster ? "WINNER" : "PICKER") : partner === i ? "PARTNER" : sits ? "SITS" : i === dealer ? "DEALS" : " "}
+            </div>
+            <div class=${"delta" + (preview ? (preview[i] > 0 ? " pos" : preview[i] < 0 ? " neg" : "") : "")}>
+              ${preview && preview[i] !== 0 ? (preview[i] > 0 ? "+" + preview[i] : preview[i]) : " "}
+            </div>
+            ${!sits
+              ? html`
+                  <button type="button" class="tapL" aria-label=${`${p}: picker`} onClick=${() => tapPicker(i)}></button>
+                  <button type="button" class="tapR" aria-label=${`${p}: partner`} onClick=${() => tapPartner(i)}></button>`
+              : null}
+          </div>`;
+        })}
+        ${rows.slice().reverse().map((r) => html`
+          ${state.players.map((_, i) => {
+            const sits = r.sitters.includes(i);
+            const t = r.totals[i];
+            return html`<div class=${"rcell" + (sits ? " sitting" : "")}>
+              ${t > 0 ? "+" + t : t}
+              ${r.picker === i
+                ? html`<span class="mark picker">${r.result === "leaster" ? "LSTR" : "P"}${r.bumped ? "·×2" : ""}</span>`
+                : r.partner === i
+                  ? html`<span class="mark partner">Pa</span>`
+                  : r.dealer === i
+                    ? html`<span class="mark dealer">D</span>`
+                    : null}
+            </div>`;
+          })}`)}
+      </div>
+    </div>
     <div class="card">
       <h2>Score a hand</h2>
-      <div class="row wrap" style="margin-bottom:8px">
-        <button type="button" class="ghost" style="font-size:13px;padding:4px 10px;min-height:36px"
-          onClick=${() => dispatch({ type: "setDealer", dealer: (dealer + 1) % n })}
-        >Dealer: ${state.players[dealer]} · tap if wrong</button>
+      <p class="hint-line">Tap the LEFT side of a column for picker, the RIGHT side for partner. Losses pay double, always.</p>
+      ${pendingDouble > 1 ? html`<p class="hint-line" style="color:var(--brass)">Doubler active: this hand pays ×${pendingDouble}.</p>` : null}
+      <div class="btngrid c2">
+        ${rules.RESULTS.map(
+          (r) => html`<button
+            type="button"
+            class=${outcome === r.key ? "primary" : ""}
+            disabled=${picker == null || partner == null}
+            onClick=${() => setOutcome(outcome === r.key ? null : r.key)}
+          >
+            <div style="font-weight:600" class=${r.win ? "" : "neg"}>${r.label}</div>
+            <div style="font-size:12px;color:var(--chalk-dim)">${r.desc}</div>
+          </button>`,
+        )}
       </div>
-      ${pendingDouble > 1 ? html`<p class="hint-line">Doubler active from a redeal: this hand pays ×${pendingDouble}.</p>` : null}
-      ${seats > 0
-        ? html`<p class="hint-line">Sitting out this hand (dealer sits their own deal${n === 7 ? ", plus the next seat" : ""}; tap to override):</p>
-            <div class="row wrap" style="margin-bottom:10px">
-              ${state.players.map(
-                (p, i) => html`<${Chip}
-                  on=${sitting.includes(i)}
-                  onClick=${() => {
-                    const cur = sitting.includes(i)
-                      ? sitting.filter((x) => x !== i)
-                      : sitting.length < seats
-                        ? [...sitting, i]
-                        : sitting;
-                    setSitOverride(cur);
-                  }}
-                >${p}<//>`,
-              )}
-            </div>`
-        : null}
-      ${okSitters
-        ? html`
-            <div class="row" style="margin-bottom:10px">
-              <${Chip} on=${leaster} onClick=${() => { setLeaster(!leaster); setPicker(null); setPartner(null); }}>Leaster (all passed)<//>
-            </div>
-            ${leaster
-              ? leasterRule === "doubler"
-                ? html`<p class="hint-line">House rule: no leaster. Redeal the hand; the next hand pays double.</p>
-                    <${Chip} onClick=${() => { dispatch({ type: "redeal" }); reset(); }}>Redeal, double next hand<//>`
-                : html`<p class="hint-line">${
-                    leasterRule === "trick"
-                      ? "Fewest points wins; a tie is broken by whoever took the first trick."
-                      : leasterRule === "jackOfDiamonds"
-                        ? "Whoever takes the jack of diamonds wins outright."
-                        : "Fewest points with at least one trick wins."
-                  }</p>
-                    <div class="row wrap">
-                      ${active.map((i) => html`<${Chip} onClick=${() => { dispatch({ type: "leaster", active, winner: i }); reset(); }}>${state.players[i]} won<//>`)}
-                      ${leasterRule === "fewest" ? html`<${Chip} onClick=${() => { dispatch({ type: "leaster", active, noWinner: true }); reset(); }}>Tie, no score<//>` : null}
-                    </div>`
-              : html`
-                  <p class="hint-line">Picker:</p>
-                  <div class="row wrap" style="margin-bottom:8px">
-                    ${active.map((i) => html`<${Chip} on=${picker === i} onClick=${() => { setPicker(i); if (partner === i) setPartner(null); }}>${state.players[i]}<//>`)}
-                  </div>
-                  ${picker != null && partnerAllowed
-                    ? html`<p class="hint-line">Partner:</p>
-                        <div class="row wrap" style="margin-bottom:8px">
-                          <${Chip} on=${partner === null} onClick=${() => setPartner(null)}>Alone<//>
-                          ${active.filter((i) => i !== picker).map(
-                            (i) => html`<${Chip} on=${partner === i} onClick=${() => setPartner(i)}>${state.players[i]}<//>`,
-                          )}
-                        </div>`
-                    : null}
-                  ${picker != null
-                    ? html`
-                        <div class="row" style="margin:6px 0 10px">
-                          ${[[1, "Clean"], [2, "Cracked ×2"], [4, "Recracked ×4"]].map(
-                            ([v, label]) => html`<${Chip} on=${crack === v} onClick=${() => setCrack(v)}>${label}<//>`,
-                          )}
-                        </div>
-                        <p class="hint-line">Schwarz outranks schneider: check tricks taken before card points.</p>
-                        <div class="btngrid c2">
-                          ${rules.RESULTS.map(
-                            (r) => html`<button type="button" onClick=${() => { dispatch({ type: "hand", active, picker, partner, result: r.key, crack }); reset(); }}>
-                              <div style="font-weight:600" class=${r.win ? "" : "neg"}>${r.label}</div>
-                              <div style="font-size:12px;color:var(--chalk-dim)">${r.desc}</div>
-                            </button>`,
-                          )}
-                        </div>`
-                    : null}
-                `}
-          `
-        : null}
+      <div class="row" style="margin-top:8px">
+        ${leasterRule === "doubler"
+          ? html`<button type="button" class="ghost grow" style="font-size:13px"
+              onClick=${() => { dispatch({ type: "redeal" }); clearSel(); }}
+            >All passed — redeal, double next hand</button>`
+          : html`<button
+              type="button"
+              class=${isLeaster ? "primary grow" : "grow"}
+              disabled=${picker == null}
+              onClick=${() => setOutcome(isLeaster ? null : "leaster")}
+            >Won leaster${picker != null && isLeaster ? ` · ${state.players[picker]}` : ""}</button>`}
+        ${leasterRule === "fewest"
+          ? html`<button type="button" class="ghost" style="font-size:13px"
+              onClick=${() => { dispatch({ type: "leaster", active, noWinner: true }); clearSel(); }}
+            >Leaster tie</button>`
+          : null}
+      </div>
+      ${isLeaster ? html`<p class="hint-line">Leaster: tap the winner's LEFT column half above.</p>` : null}
+      <div class="row" style="margin-top:12px">
+        <button type="button" class="grow" disabled=${!canUndo && picker == null && partner == null && outcome == null} onClick=${undo}>↺ Undo</button>
+        <button type="button" class="primary grow" disabled=${!canScore} onClick=${scoreHand}>
+          Score hand
+        </button>
+      </div>
     </div>
-    <div class="card"><h2>Hands</h2><${LogList} lines=${log} /></div>
     <button type="button" style="width:100%" onClick=${onDone}>Finish session</button>
   </div>`;
 }

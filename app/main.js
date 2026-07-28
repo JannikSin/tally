@@ -192,7 +192,15 @@ function GameScreen({ game, bump }) {
     </div>
     <div class="screen">
       ${session
-        ? html`<${game.Play} state=${session.state} log=${session.log} dispatch=${dispatch} onRematch=${rematch} onDone=${finish} />`
+        ? html`<${game.Play}
+            state=${session.state}
+            log=${session.log}
+            dispatch=${dispatch}
+            onRematch=${rematch}
+            onDone=${finish}
+            onUndo=${() => { store.undo(meta.id); bump(); }}
+            canUndo=${store.canUndo(meta.id)}
+          />`
         : html`<${game.Setup} onStart=${start} roster=${store.roster()} history=${store.history(meta.id)} />`}
     </div>
   </div>`;

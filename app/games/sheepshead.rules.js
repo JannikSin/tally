@@ -23,33 +23,64 @@ export const meta = {
   hint: "Picker, partner, schneider, schwarz.",
 };
 
+// House vocabulary: "no schneider" = the losing side never reached 31 (×2),
+// "no trick" = the losing side took no trick at all (×3). Never "schwarz".
+// Keys stay stable for saved sessions; only labels changed.
 export const RESULTS = [
   { key: "win", label: "Won", desc: "61–90", mult: 1, win: true },
-  { key: "winSchneider", label: "Won schneider", desc: "91–120", mult: 2, win: true },
-  { key: "winSchwarz", label: "Won schwarz", desc: "every trick", mult: 3, win: true },
+  { key: "winSchneider", label: "Won, no schneider", desc: "91–120 · ×2", mult: 2, win: true },
+  { key: "winSchwarz", label: "Won, no trick", desc: "every trick · ×3", mult: 3, win: true },
   { key: "loss", label: "Lost", desc: "31–60", mult: 1, win: false },
-  { key: "lossSchneider", label: "Lost schneider", desc: "0–30", mult: 2, win: false },
-  { key: "lossSchwarz", label: "Lost schwarz", desc: "no tricks", mult: 3, win: false },
+  { key: "lossSchneider", label: "Lost, no schneider", desc: "0–30 · ×2", mult: 2, win: false },
+  { key: "lossSchwarz", label: "Lost, no trick", desc: "no tricks · ×3", mult: 3, win: false },
 ];
 
 export function init(config) {
   return {
-    players: config.players, // seating order; the deal passes left through this array
+    players: config.players, // seating order; the deal starts at seat 1 and rotates, no exceptions
     totals: Array(config.players.length).fill(0),
     hands: 0,
     dealer: 0,
+    rows: [], // one per scored hand: {totals, picker, partner, dealer, sitters, result, ...}
+    // double on the bump: every picker-side loss pays double, house rule, always on
+    bumpDouble: config.bumpDouble !== false,
     leasterRule: config.leasterRule || "fewest", // "fewest" | "trick" | "jackOfDiamonds" | "doubler"
     pendingDouble: 1, // set by a "doubler" redeal; consumed by the next hand/leaster
     stats: { picks: {}, pickWins: {}, schwarzes: {} }, // rivalry counters keyed by player name
   };
 }
 
-// House convention: hands play at most five-handed; the dealer sits out their
-// own deal in a 6-hand game, dealer plus the next seat in a 7-hand game.
+// House convention, no exceptions: hands play at most five-handed; the dealer
+// sits out their own deal in a 6-hand game, dealer plus the player to the
+// dealer's right in a 7-hand game.
 export function autoSitters(playerCount, dealer) {
   if (playerCount <= 5) return [];
   if (playerCount === 6) return [dealer];
-  return [dealer, (dealer + 1) % playerCount];
+  return [dealer, (dealer - 1 + playerCount) % playerCount];
+}
+
+// Full-table deltas (0 for sitters) for a prospective hand: what the payout
+// WOULD be. The UI shows this before Score hand solidifies it.
+export function previewDeltas(state, active, picker, partner, resultKey) {
+  const r = RESULTS.find((x) => x.key === resultKey);
+  const bump = !r.win && state.bumpDouble !== false ? 2 : 1;
+  const deltas = handDeltas(
+    active.length,
+    active.indexOf(picker),
+    partner == null ? null : active.indexOf(partner),
+    resultKey,
+    bump * (state.pendingDouble || 1),
+  );
+  const full = Array(state.players.length).fill(0);
+  active.forEach((p, i) => { full[p] = deltas[i]; });
+  return full;
+}
+
+export function previewLeaster(state, active, winner) {
+  const doubler = state.pendingDouble || 1;
+  const full = Array(state.players.length).fill(0);
+  active.forEach((p) => { full[p] = (p === winner ? active.length - 1 : -1) * doubler; });
+  return full;
 }
 
 // deltas over the active players of one hand, in units; zero-sum by construction.
@@ -75,10 +106,6 @@ export function handDeltas(activeCount, pickerIdx, partnerIdx, resultKey, crack 
 }
 
 export function reduce(state, action) {
-  if (action.type === "setDealer") {
-    // manual correction when the table's deal got out of sync with the app
-    return { state: { ...state, dealer: action.dealer }, line: null };
-  }
   if (action.type === "redeal") {
     // all passed under the "doubler" house rule: void hand, SAME dealer redeals,
     // next hand's stakes double
@@ -86,40 +113,45 @@ export function reduce(state, action) {
     return { state: { ...state, pendingDouble }, line: `Redeal, all passed: next hand pays ×${pendingDouble}` };
   }
   if (action.type === "hand") {
-    const { active, picker, partner, result, crack = 1 } = action;
+    const { active, picker, partner, result } = action;
     const r = RESULTS.find((x) => x.key === result);
     const doubler = state.pendingDouble || 1;
-    const deltas = handDeltas(
-      active.length,
-      active.indexOf(picker),
-      partner == null ? null : active.indexOf(partner),
-      result,
-      crack * doubler,
-    );
-    const totals = state.totals.slice();
-    active.forEach((p, i) => { totals[p] += deltas[i]; });
+    const full = previewDeltas(state, active, picker, partner, result);
+    const totals = state.totals.map((t, i) => t + full[i]);
     const stats = structuredClone(state.stats || { picks: {}, pickWins: {}, schwarzes: {} });
     const pname = state.players[picker];
     stats.picks[pname] = (stats.picks[pname] || 0) + 1;
     if (r.win) stats.pickWins[pname] = (stats.pickWins[pname] || 0) + 1;
     if (result === "winSchwarz") stats.schwarzes[pname] = (stats.schwarzes[pname] || 0) + 1;
-    const line = `${state.players[picker]}${partner != null && partner !== picker ? ` + ${state.players[partner]}` : " alone"}: ${r.label.toLowerCase()}${crack > 1 ? ` ×${crack}` : ""}${doubler > 1 ? ` (doubler ×${doubler})` : ""}`;
+    const bumped = !r.win && state.bumpDouble !== false;
+    const line = `${state.players[picker]}${partner != null && partner !== picker ? ` + ${state.players[partner]}` : " alone"}: ${r.label.toLowerCase()}${bumped ? " · bump ×2" : ""}${doubler > 1 ? ` · doubler ×${doubler}` : ""}`;
+    const sitters = state.players.map((_, i) => i).filter((i) => !active.includes(i));
+    const rows = (state.rows || []).concat([{
+      totals: totals.slice(), picker, partner: partner ?? null,
+      dealer: state.dealer || 0, sitters, result, bumped, doubler,
+    }]);
     const dealer = ((state.dealer || 0) + 1) % state.players.length;
-    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1, dealer, stats }, line };
+    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1, dealer, stats, rows }, line };
   }
   if (action.type === "leaster") {
     const { active, winner, noWinner } = action;
     const doubler = state.pendingDouble || 1;
-    const totals = state.totals.slice();
+    let totals = state.totals.slice();
     let line;
     if (noWinner) {
       line = "Leaster, tied for fewest: no score";
     } else {
-      active.forEach((p) => { totals[p] += (p === winner ? active.length - 1 : -1) * doubler; });
-      line = `Leaster: ${state.players[winner]} takes it${doubler > 1 ? ` (doubler ×${doubler})` : ""}`;
+      const full = previewLeaster(state, active, winner);
+      totals = totals.map((t, i) => t + full[i]);
+      line = `Leaster: ${state.players[winner]} takes it${doubler > 1 ? ` · doubler ×${doubler}` : ""}`;
     }
+    const sitters = state.players.map((_, i) => i).filter((i) => !active.includes(i));
+    const rows = (state.rows || []).concat([{
+      totals: totals.slice(), picker: noWinner ? null : winner, partner: null,
+      dealer: state.dealer || 0, sitters, result: "leaster", doubler,
+    }]);
     const dealer = ((state.dealer || 0) + 1) % state.players.length;
-    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1, dealer }, line };
+    return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1, dealer, rows }, line };
   }
   return { state, line: null };
 }
