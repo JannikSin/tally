@@ -3,6 +3,17 @@
 Static PWA, no build step, vanilla Preact + htm vendored. Deployed to GitHub Pages
 (public repo). Scores games; does not play them.
 
+## Design north star: paper first
+Every scoring surface imitates how the game is REALLY scored on paper or on the
+physical board, as closely as possible. Tally is a stand-in for the paper sheet,
+the pegboard, the score pad — used when paper isn't there or isn't wanted — and its
+long-term goal is to beat paper at its own game, not to replace it with app-brain
+abstractions. When choosing between a conventional app widget and the way a real
+scorekeeper would write it (columns per player, rows per hand, a cross-lined bridge
+pad, a foots column, marks in corners), choose the paper way. The sheepshead hand
+sheet and the bridge above/below-the-line pad are the reference implementations of
+this principle.
+
 ## Hard rules (public repo)
 - **No real names anywhere in the repo**: tests, fixtures, README, screenshots, commit
   messages use `P1..P6`, `North/South/East/West`, or `We/They` only. Player names live
