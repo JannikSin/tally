@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./sheepshead.rules.js";
 import { PlayerNames, Seg } from "../ui.js";
@@ -49,76 +49,102 @@ export function Setup({ onStart, roster, history }) {
   </div>`;
 }
 
-const RESULT_LABEL = {
-  win: "Won", winSchneider: "Won, no schneider", winSchwarz: "Won, no trick",
-  loss: "Lost", lossSchneider: "Lost, no schneider", lossSchwarz: "Lost, no trick",
-  leaster: "Leaster",
-};
-
 export function Play({ state, dispatch, onDone, onUndo, canUndo }) {
   const n = state.players.length;
   const dealer = state.dealer || 0;
   const sitting = rules.autoSitters(n, dealer); // no exceptions, no overrides
   const active = state.players.map((_, i) => i).filter((i) => !sitting.includes(i));
   const [picker, setPicker] = useState(null);
-  const [partner, setPartner] = useState(null);
-  const [outcome, setOutcome] = useState(null); // result key | "leaster"
+  const [partner, setPartner] = useState(null); // same player as picker = going alone
+  const [won, setWon] = useState(null); // true | false | null; Won and Lost exclusive
+  const [mod, setMod] = useState(null); // "schneider" | "trick" | null; exclusive pair
+  const [leaster, setLeaster] = useState(false);
+  const [double, setDouble] = useState(1); // cycles 1 -> 2 -> 4 -> 6 -> 1
   const leasterRule = state.leasterRule || "fewest";
   const pendingDouble = state.pendingDouble || 1;
   const rows = state.rows || [];
-  const clearSel = () => { setPicker(null); setPartner(null); setOutcome(null); };
+  const clearSel = () => { setPicker(null); setPartner(null); setWon(null); setMod(null); setLeaster(false); setDouble(1); };
 
-  // left half = picker, right half = partner; tap toggles, tapping another
-  // column steals the role; picker and partner can never be the same player
+  // hands stack upward: the newest row sits just above the header, scroll up
+  // through the sheet for the early hands
+  const sheetRef = useRef(null);
+  useEffect(() => {
+    if (sheetRef.current) sheetRef.current.scrollTop = sheetRef.current.scrollHeight;
+  }, [rows.length, n]);
+
   const tapPicker = (i) => {
     if (sitting.includes(i)) return;
-    if (picker === i) setPicker(null);
-    else { setPicker(i); if (partner === i) setPartner(null); }
+    setPicker(picker === i ? null : i);
   };
   const tapPartner = (i) => {
     if (sitting.includes(i)) return;
-    if (partner === i) setPartner(null);
-    else { setPartner(i); if (picker === i) setPicker(null); }
+    setPartner(partner === i ? null : i);
   };
 
-  const isLeaster = outcome === "leaster";
-  const canScore =
-    outcome != null && picker != null && (isLeaster || partner != null);
+  const resultKey = leaster
+    ? "leaster"
+    : won == null
+      ? null
+      : won
+        ? mod === "schneider" ? "winSchneider" : mod === "trick" ? "winSchwarz" : "win"
+        : mod === "schneider" ? "lossSchneider" : mod === "trick" ? "lossSchwarz" : "loss";
+  const canScore = leaster ? picker != null : resultKey != null && picker != null && partner != null;
   const preview = canScore
-    ? isLeaster
-      ? rules.previewLeaster(state, active, picker)
-      : rules.previewDeltas(state, active, picker, partner, outcome)
+    ? leaster
+      ? rules.previewLeaster(state, active, picker, double)
+      : rules.previewDeltas(state, active, picker, partner, resultKey, double)
     : null;
 
   const scoreHand = () => {
     if (!canScore) return;
-    if (isLeaster) dispatch({ type: "leaster", active, winner: picker });
-    else dispatch({ type: "hand", active, picker, partner, result: outcome });
+    if (leaster) dispatch({ type: "leaster", active, winner: picker, doubleMult: double });
+    else dispatch({ type: "hand", active, picker, partner, result: resultKey, doubleMult: double });
     clearSel();
   };
-  // one undo button for everything: selections unwind first, then scored hands
+  // one undo for everything: selections unwind first, then scored hands
   const undo = () => {
-    if (outcome != null) setOutcome(null);
+    if (mod != null) setMod(null);
+    else if (leaster) setLeaster(false);
+    else if (won != null) setWon(null);
+    else if (double > 1) setDouble(1);
     else if (partner != null) setPartner(null);
     else if (picker != null) setPicker(null);
     else onUndo();
   };
 
+  const toggle = "min-height:52px;font-weight:600";
   return html`<div>
-    <div class="sheet-wrap">
+    <div class="sheet-wrap" ref=${sheetRef}>
       <div class="sheet" style=${`grid-template-columns: repeat(${n}, minmax(64px, 1fr))`}>
+        ${rows.map((r) => html`
+          ${state.players.map((_, i) => {
+            const sits = r.sitters.includes(i);
+            const t = r.totals[i];
+            const aloneRow = r.picker != null && r.picker === r.partner;
+            return html`<div class=${"rcell" + (sits ? " sitting" : "")}>
+              ${t > 0 ? "+" + t : t}
+              ${r.picker === i
+                ? html`<span class="mark picker">${r.result === "leaster" ? "LSTR" : aloneRow ? "P·A" : "P"}${r.doubler > 1 ? `·×${r.doubler}` : r.bumped ? "·×2" : ""}</span>`
+                : r.partner === i
+                  ? html`<span class="mark partner">Pa</span>`
+                  : r.dealer === i
+                    ? html`<span class="mark dealer">D</span>`
+                    : null}
+            </div>`;
+          })}`)}
         ${state.players.map((p, i) => {
           const sits = sitting.includes(i);
+          const alone = picker === i && partner === i;
           const cls = `hcell${sits ? " sitting" : ""}${picker === i ? " is-picker" : ""}${partner === i ? " is-partner" : ""}`;
           const t = state.totals[i];
           return html`<div class=${cls}>
             <div class="nm">${p}${i === dealer ? " ●" : ""}</div>
             <div class=${"tot" + (t > 0 ? " pos" : t < 0 ? " neg" : "")}>${t > 0 ? "+" + t : t}</div>
             <div class=${"role" + (picker === i ? " picker" : partner === i ? " partner" : "")}>
-              ${picker === i ? (isLeaster ? "WINNER" : "PICKER") : partner === i ? "PARTNER" : sits ? "SITS" : i === dealer ? "DEALS" : " "}
+              ${alone ? "ALONE" : picker === i ? (leaster ? "WINNER" : "PICKER") : partner === i ? "PARTNER" : sits ? "SITS" : i === dealer ? "DEALS" : " "}
             </div>
             <div class=${"delta" + (preview ? (preview[i] > 0 ? " pos" : preview[i] < 0 ? " neg" : "") : "")}>
-              ${preview && preview[i] !== 0 ? (preview[i] > 0 ? "+" + preview[i] : preview[i]) : " "}
+              ${preview && preview[i] !== 0 ? (preview[i] > 0 ? "+" + preview[i] : preview[i]) : " "}
             </div>
             ${!sits
               ? html`
@@ -127,63 +153,40 @@ export function Play({ state, dispatch, onDone, onUndo, canUndo }) {
               : null}
           </div>`;
         })}
-        ${rows.slice().reverse().map((r) => html`
-          ${state.players.map((_, i) => {
-            const sits = r.sitters.includes(i);
-            const t = r.totals[i];
-            return html`<div class=${"rcell" + (sits ? " sitting" : "")}>
-              ${t > 0 ? "+" + t : t}
-              ${r.picker === i
-                ? html`<span class="mark picker">${r.result === "leaster" ? "LSTR" : "P"}${r.bumped ? "·×2" : ""}</span>`
-                : r.partner === i
-                  ? html`<span class="mark partner">Pa</span>`
-                  : r.dealer === i
-                    ? html`<span class="mark dealer">D</span>`
-                    : null}
-            </div>`;
-          })}`)}
       </div>
     </div>
     <div class="card">
-      <h2>Score a hand</h2>
-      <p class="hint-line">Tap the LEFT side of a column for picker, the RIGHT side for partner. Losses pay double, always.</p>
-      ${pendingDouble > 1 ? html`<p class="hint-line" style="color:var(--brass)">Doubler active: this hand pays ×${pendingDouble}.</p>` : null}
+      ${pendingDouble > 1 ? html`<p class="hint-line" style="color:var(--brass)">Redeal doubler active: this hand pays ×${pendingDouble} extra.</p>` : null}
       <div class="btngrid c2">
-        ${rules.RESULTS.map(
-          (r) => html`<button
-            type="button"
-            class=${outcome === r.key ? "primary" : ""}
-            disabled=${picker == null || partner == null}
-            onClick=${() => setOutcome(outcome === r.key ? null : r.key)}
-          >
-            <div style="font-weight:600" class=${r.win ? "" : "neg"}>${r.label}</div>
-            <div style="font-size:12px;color:var(--chalk-dim)">${r.desc}</div>
-          </button>`,
-        )}
+        <button type="button" style=${toggle} class=${won === true ? "primary" : ""}
+          onClick=${() => { setWon(won === true ? null : true); setLeaster(false); }}>Won</button>
+        <button type="button" style=${toggle} class=${won === false ? "primary" : ""}
+          onClick=${() => { setWon(won === false ? null : false); setLeaster(false); }}><span class=${won === false ? "" : "neg"}>Lost</span></button>
+        <button type="button" style=${toggle} class=${mod === "schneider" ? "primary" : ""}
+          onClick=${() => { setMod(mod === "schneider" ? null : "schneider"); setLeaster(false); }}>No schneider</button>
+        <button type="button" style=${toggle} class=${mod === "trick" ? "primary" : ""}
+          onClick=${() => { setMod(mod === "trick" ? null : "trick"); setLeaster(false); }}>No trick</button>
+        <button type="button" style=${toggle} class=${leaster ? "primary" : ""}
+          onClick=${() => {
+            if (leasterRule === "doubler") { dispatch({ type: "redeal" }); clearSel(); return; }
+            const next = !leaster;
+            setLeaster(next);
+            if (next) { setWon(null); setMod(null); }
+          }}>${leasterRule === "doubler" ? "Redeal ×2" : "Leaster"}</button>
+        <button type="button" style=${toggle} class=${double > 1 ? "primary" : ""}
+          onClick=${() => setDouble(double === 1 ? 2 : double === 2 ? 4 : double === 4 ? 6 : 1)}
+        >Double${double > 1 ? ` ×${double}` : ""}</button>
       </div>
-      <div class="row" style="margin-top:8px">
-        ${leasterRule === "doubler"
-          ? html`<button type="button" class="ghost grow" style="font-size:13px"
-              onClick=${() => { dispatch({ type: "redeal" }); clearSel(); }}
-            >All passed — redeal, double next hand</button>`
-          : html`<button
-              type="button"
-              class=${isLeaster ? "primary grow" : "grow"}
-              disabled=${picker == null}
-              onClick=${() => setOutcome(isLeaster ? null : "leaster")}
-            >Won leaster${picker != null && isLeaster ? ` · ${state.players[picker]}` : ""}</button>`}
-        ${leasterRule === "fewest"
-          ? html`<button type="button" class="ghost" style="font-size:13px"
-              onClick=${() => { dispatch({ type: "leaster", active, noWinner: true }); clearSel(); }}
-            >Leaster tie</button>`
-          : null}
-      </div>
-      ${isLeaster ? html`<p class="hint-line">Leaster: tap the winner's LEFT column half above.</p>` : null}
+      ${leaster && leasterRule === "fewest"
+        ? html`<button type="button" class="ghost" style="width:100%;margin-top:8px;font-size:13px"
+            onClick=${() => { dispatch({ type: "leaster", active, noWinner: true }); clearSel(); }}
+          >Tie, no score</button>`
+        : null}
       <div class="row" style="margin-top:12px">
-        <button type="button" class="grow" disabled=${!canUndo && picker == null && partner == null && outcome == null} onClick=${undo}>↺ Undo</button>
-        <button type="button" class="primary grow" disabled=${!canScore} onClick=${scoreHand}>
-          Score hand
-        </button>
+        <button type="button" class="ghost" style="font-size:13px;min-height:44px"
+          disabled=${!canUndo && picker == null && partner == null && won == null && mod == null && !leaster && double === 1}
+          onClick=${undo}>↺ Undo</button>
+        <button type="button" class="primary grow" disabled=${!canScore} onClick=${scoreHand}>Score hand</button>
       </div>
     </div>
     <button type="button" style="width:100%" onClick=${onDone}>Finish session</button>

@@ -433,6 +433,23 @@ test("sheepshead double on the bump and the hand sheet rows", () => {
   assert.equal(s.rows[1].dealer, 1);
 });
 
+test("sheepshead alone (picker = partner) and the Double button multiplier", () => {
+  let s = sheep.init({ players: ["P1", "P2", "P3", "P4", "P5"] });
+  // picker and partner the same player = going alone: picker moves 4 shares
+  assert.deepEqual(sheep.previewDeltas(s, [0, 1, 2, 3, 4], 0, 0, "win"), [4, -1, -1, -1, -1]);
+  // Double x4 on a won no-schneider: bucket x2, doubler x4
+  assert.deepEqual(sheep.previewDeltas(s, [0, 1, 2, 3, 4], 0, 1, "winSchneider", 4), [16, 8, -8, -8, -8]);
+  // Double x2 on a loss stacks with the automatic bump: 1 x2 bump x2 double = x4
+  assert.deepEqual(sheep.previewDeltas(s, [0, 1, 2, 3, 4], 0, 1, "loss", 2), [-8, -4, 4, 4, 4]);
+  const r = sheep.reduce(s, { type: "hand", active: [0, 1, 2, 3, 4], picker: 0, partner: 0, result: "win", doubleMult: 2 });
+  assert.deepEqual(r.state.totals, [8, -2, -2, -2, -2]);
+  assert.match(r.line, /P1 alone: won · doubler ×2/);
+  assert.equal(r.state.rows[0].partner, 0); // alone recorded as picker = partner
+  // leaster with the Double button
+  const l = sheep.reduce(s, { type: "leaster", active: [0, 1, 2, 3, 4], winner: 3, doubleMult: 2 });
+  assert.deepEqual(l.state.totals, [-2, -2, -2, 8, -2]);
+});
+
 test("games emit structured results for the rivalry ledger", () => {
   let e = euchre.init({ teams: ["We", "They"], target: 6 });
   e = euchre.reduce(e, { type: "hand", makers: 1, result: "euchred" }).state; // We euchre them

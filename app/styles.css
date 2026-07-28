@@ -304,6 +304,9 @@ input[type="text"], input[type="number"] {
 /* ---------- hand sheet (sheepshead): columns per player, a row per hand ---------- */
 .sheet-wrap {
   overflow-x: auto;
+  /* hands stack upward: cap the height, auto-scrolled to the bottom, scroll up for history */
+  overflow-y: auto;
+  max-height: 46vh;
   border: 1px solid var(--line);
   border-radius: 14px;
   margin-bottom: 14px;
@@ -318,8 +321,11 @@ input[type="text"], input[type="number"] {
   min-width: 64px;
   padding: 8px 4px 6px;
   text-align: center;
-  border-bottom: 2px solid var(--line);
+  border-top: 2px solid var(--line);
   border-right: 1px solid color-mix(in srgb, var(--line) 45%, transparent);
+  position: sticky;
+  bottom: 0;
+  background: var(--felt);
 }
 .sheet .hcell:last-child { border-right: 0; }
 .sheet .hcell .nm {

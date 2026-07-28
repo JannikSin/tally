@@ -61,7 +61,9 @@ export function autoSitters(playerCount, dealer) {
 
 // Full-table deltas (0 for sitters) for a prospective hand: what the payout
 // WOULD be. The UI shows this before Score hand solidifies it.
-export function previewDeltas(state, active, picker, partner, resultKey) {
+// doubleMult: the table's manual doubler button (1, 2, 4, 6), on top of any
+// redeal doubler and the automatic bump.
+export function previewDeltas(state, active, picker, partner, resultKey, doubleMult = 1) {
   const r = RESULTS.find((x) => x.key === resultKey);
   const bump = !r.win && state.bumpDouble !== false ? 2 : 1;
   const deltas = handDeltas(
@@ -69,15 +71,15 @@ export function previewDeltas(state, active, picker, partner, resultKey) {
     active.indexOf(picker),
     partner == null ? null : active.indexOf(partner),
     resultKey,
-    bump * (state.pendingDouble || 1),
+    bump * doubleMult * (state.pendingDouble || 1),
   );
   const full = Array(state.players.length).fill(0);
   active.forEach((p, i) => { full[p] = deltas[i]; });
   return full;
 }
 
-export function previewLeaster(state, active, winner) {
-  const doubler = state.pendingDouble || 1;
+export function previewLeaster(state, active, winner, doubleMult = 1) {
+  const doubler = (state.pendingDouble || 1) * doubleMult;
   const full = Array(state.players.length).fill(0);
   active.forEach((p) => { full[p] = (p === winner ? active.length - 1 : -1) * doubler; });
   return full;
@@ -113,10 +115,10 @@ export function reduce(state, action) {
     return { state: { ...state, pendingDouble }, line: `Redeal, all passed: next hand pays ×${pendingDouble}` };
   }
   if (action.type === "hand") {
-    const { active, picker, partner, result } = action;
+    const { active, picker, partner, result, doubleMult = 1 } = action;
     const r = RESULTS.find((x) => x.key === result);
-    const doubler = state.pendingDouble || 1;
-    const full = previewDeltas(state, active, picker, partner, result);
+    const doubler = (state.pendingDouble || 1) * doubleMult;
+    const full = previewDeltas(state, active, picker, partner, result, doubleMult);
     const totals = state.totals.map((t, i) => t + full[i]);
     const stats = structuredClone(state.stats || { picks: {}, pickWins: {}, schwarzes: {} });
     const pname = state.players[picker];
@@ -124,24 +126,25 @@ export function reduce(state, action) {
     if (r.win) stats.pickWins[pname] = (stats.pickWins[pname] || 0) + 1;
     if (result === "winSchwarz") stats.schwarzes[pname] = (stats.schwarzes[pname] || 0) + 1;
     const bumped = !r.win && state.bumpDouble !== false;
-    const line = `${state.players[picker]}${partner != null && partner !== picker ? ` + ${state.players[partner]}` : " alone"}: ${r.label.toLowerCase()}${bumped ? " · bump ×2" : ""}${doubler > 1 ? ` · doubler ×${doubler}` : ""}`;
+    const alone = partner == null || partner === picker;
+    const line = `${state.players[picker]}${alone ? " alone" : ` + ${state.players[partner]}`}: ${r.label.toLowerCase()}${bumped ? " · bump ×2" : ""}${doubler > 1 ? ` · doubler ×${doubler}` : ""}`;
     const sitters = state.players.map((_, i) => i).filter((i) => !active.includes(i));
     const rows = (state.rows || []).concat([{
-      totals: totals.slice(), picker, partner: partner ?? null,
+      totals: totals.slice(), picker, partner: alone ? picker : partner,
       dealer: state.dealer || 0, sitters, result, bumped, doubler,
     }]);
     const dealer = ((state.dealer || 0) + 1) % state.players.length;
     return { state: { ...state, totals, hands: state.hands + 1, pendingDouble: 1, dealer, stats, rows }, line };
   }
   if (action.type === "leaster") {
-    const { active, winner, noWinner } = action;
-    const doubler = state.pendingDouble || 1;
+    const { active, winner, noWinner, doubleMult = 1 } = action;
+    const doubler = (state.pendingDouble || 1) * doubleMult;
     let totals = state.totals.slice();
     let line;
     if (noWinner) {
       line = "Leaster, tied for fewest: no score";
     } else {
-      const full = previewLeaster(state, active, winner);
+      const full = previewLeaster(state, active, winner, doubleMult);
       totals = totals.map((t, i) => t + full[i]);
       line = `Leaster: ${state.players[winner]} takes it${doubler > 1 ? ` · doubler ×${doubler}` : ""}`;
     }
