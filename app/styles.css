@@ -29,6 +29,8 @@
   --mono: "JBMono", ui-monospace, monospace;
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -97,7 +99,15 @@ input[type="text"], input[type="number"] {
 .home-head .iconlink { color: var(--chalk-dim); }
 
 /* ---------- shell ---------- */
-#app { max-width: 560px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; }
+#app {
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+}
 
 .topbar {
   position: sticky;
@@ -481,6 +491,47 @@ td.pos { color: #7fd49a; }
 
 .fade-in { animation: fade 0.18s ease-out; }
 @keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+
+/* ---------- landscape phone: short viewport, wide screen ---------- */
+@media (orientation: landscape) and (max-height: 500px) {
+  #app { max-width: 760px; }
+
+  .topbar { padding: calc(6px + var(--sat)) 14px 6px; }
+  .topbar h1 { font-size: 18px; }
+
+  .home-head { padding: calc(12px + var(--sat)) 18px 4px; }
+  .home-head h1 { font-size: 30px; }
+  .tiles { grid-template-columns: repeat(4, 1fr); padding-bottom: calc(16px + var(--sab)); }
+  .tile { min-height: 96px; }
+
+  .screen { padding: 10px 14px calc(16px + var(--sab)); }
+
+  /* latest score stays pinned under the top bar while the entry buttons scroll */
+  .bigscore {
+    position: sticky;
+    top: calc(38px + var(--sat));
+    z-index: 9;
+    margin-bottom: 10px;
+  }
+  .bigscore .half { padding: 6px 8px 5px; }
+  /* height-based clamp: 19vw of a landscape screen would swallow it */
+  .bigscore .val { font-size: clamp(30px, 13vh, 52px); }
+
+  .scoreband { top: calc(38px + var(--sat)); margin-bottom: 10px; }
+  .scoreband .cell .tot { font-size: clamp(16px, 7vh, 24px); }
+
+  .scorebar {
+    position: sticky;
+    top: calc(38px + var(--sat));
+    z-index: 9;
+    margin-bottom: 10px;
+  }
+  .scorebox { padding: 5px 12px 4px; }
+  .scorebox .pts { font-size: clamp(20px, 9vh, 30px); }
+
+  .sheet-wrap { max-height: 38vh; }
+  .card { padding: 10px 14px; margin-bottom: 10px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
