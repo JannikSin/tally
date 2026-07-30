@@ -374,6 +374,14 @@ test("rook made and set hands", () => {
   assert.match(rook.summary(s).line, /We win 340–20/);
 });
 
+test("rook house deck: 125 points, bids open at 50", () => {
+  assert.deepEqual(rook.handScore(0, 50, 60, 125), { made: true, delta: [60, 65] });
+  assert.deepEqual(rook.handScore(1, 85, 80, 125), { made: false, delta: [45, -85] });
+  assert.equal(rook.minBidFor(125), 50);
+  assert.equal(rook.minBidFor(120), 70);
+  assert.equal(rook.minBidFor(140), 70);
+});
+
 test("rook deck variants change the defender remainder and bid ceiling", () => {
   assert.deepEqual(rook.handScore(0, 100, 100, 140), { made: true, delta: [100, 40] });
   assert.deepEqual(rook.handScore(0, 150, 120, 180), { made: false, delta: [-150, 60] });

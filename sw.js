@@ -1,10 +1,10 @@
-// Offline cache, same strategy as grandstand:
+﻿// Offline cache, same strategy as grandstand:
 //   vendor/ + icons/  -> cache-first (immutable, versioned by CACHE bump)
 //   everything else (shell, app/) -> network-first, fallback to cache
 // Bump CACHE on every deploy that touches precached files.
-const CACHE = "tally-v8";
+const CACHE = "tally-v9";
 
-// Manual list — nothing derives this from the filesystem. Every shipped file
+// Manual list â€” nothing derives this from the filesystem. Every shipped file
 // under app/, app/games/, vendor/, and icons/ must be added here by hand,
 // or the app silently breaks offline for anyone who installed it.
 const PRECACHE = [
@@ -96,3 +96,4 @@ self.addEventListener("fetch", (e) => {
       ),
   );
 });
+

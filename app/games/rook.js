@@ -69,7 +69,7 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
       : html`<div class="card">
           <h2>${state.teams[bidTeam]} took the bid (tap the scoreboard to switch)</h2>
           <div style="margin-top:10px">
-            <${Stepper} label="Bid" value=${bid} min=${70} max=${deck} step=${5} onChange=${setBid} />
+            <${Stepper} label="Bid" value=${bid} min=${rules.minBidFor(deck)} max=${deck} step=${5} onChange=${setBid} />
           </div>
           <h2 style="margin-top:12px">Counters the bidding team captured</h2>
           <div class="btngrid c6">

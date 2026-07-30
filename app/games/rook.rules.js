@@ -1,9 +1,12 @@
 // rook-style partnership bidding, Kentucky Discard scoring. Base deck: 120
 // counter points (5s=5, 10s=10, 14s=10, bird=20). Deck variants add points:
 //   140 = last trick worth 20 · 180 = 1s high worth 15 each · 200 = both
-// Bids 70..deck by 5. Make the bid: keep what you captured; get set: lose the
-// bid, defenders keep their capture. First team to the target (300 or 500)
-// wins; higher total breaks a double-cross.
+//   125 = house rules (bird worth 25 like one full color, played lowest
+//         trump; bids open at 50 for this preset)
+// Bids open at each preset's minBid (default 70)..deck by 5. Make the bid:
+// keep what you captured; get set: lose the bid, defenders keep their
+// capture. First team to the target (300 or 500) wins; higher total breaks
+// a double-cross.
 // ponytail: no shoot-the-moon variant; add if the table ever calls it.
 
 export const meta = {
@@ -17,10 +20,13 @@ export const meta = {
 export const DECK = 120; // base deck; sessions carry their own state.deck
 export const DECKS = [
   { value: 120, label: "120 · base" },
+  { value: 125, label: "125 · house (Rook 25, bird low)", minBid: 50 },
   { value: 140, label: "140 · last trick +20" },
   { value: 180, label: "180 · 1s high" },
   { value: 200, label: "200 · both" },
 ];
+
+export const minBidFor = (deck) => (DECKS.find((d) => d.value === deck) || {}).minBid || 70;
 
 export function init(config) {
   return {
