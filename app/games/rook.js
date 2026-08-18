@@ -1,10 +1,17 @@
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { html } from "htm/preact";
 import * as rules from "./rook.rules.js";
-import { BigScore, LogList, OverBanner, Seg, Stepper } from "../ui.js";
+import { OverBanner, Seg, Stepper } from "../ui.js";
 
 export const meta = rules.meta;
 export { rules };
+
+// trump-color chips; black gets a chalk ring so it reads on the felt
+const COLOR_HEX = { red: "#e5674a", yellow: "#e5b04a", green: "#7fd49a", black: "#141414" };
+const Dot = ({ color }) =>
+  html`<i
+    style=${`display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:baseline;background:${COLOR_HEX[color]};${color === "black" ? "border:1px solid var(--chalk-dim)" : ""}`}
+  ></i>`;
 
 export function Setup({ onStart, history }) {
   const [teams, setTeams] = useState(["We", "They"]);
@@ -46,30 +53,79 @@ export function Setup({ onStart, history }) {
   </div>`;
 }
 
-export function Play({ state, log, dispatch, onRematch, onDone }) {
+export function Play({ state, dispatch, onRematch, onDone }) {
   const [bidTeam, setBidTeam] = useState(0);
   const [bid, setBid] = useState(100);
+  const [color, setColor] = useState(null);
   const [captured, setCaptured] = useState(null);
+  const [buried, setBuried] = useState(0);
   const deck = state.deck || rules.DECK;
   const sum = rules.summary(state);
-  const lead = state.totals[0] === state.totals[1] ? -1 : state.totals[0] > state.totals[1] ? 0 : 1;
+  const rounds = state.rounds || [];
+
+  // hands stack downward like a paper pad; keep the newest row in view
+  const sheetRef = useRef(null);
+  useEffect(() => {
+    if (sheetRef.current) sheetRef.current.scrollTop = sheetRef.current.scrollHeight;
+  }, [rounds.length]);
+
+  const preview =
+    !sum.done && captured != null ? rules.handScore(bidTeam, bid, captured, deck).delta : null;
+
+  const score = () => {
+    dispatch({ type: "hand", bidTeam, bid, captured, color, buried });
+    setCaptured(null); setColor(null); setBuried(0); setBid(100);
+  };
+
   return html`<div>
-    <${BigScore}
-      entries=${[0, 1].map((i) => ({
-        who: state.teams[i],
-        pts: state.totals[i],
-        lead: i === lead,
-        picked: !sum.done && bidTeam === i,
-        sub: !sum.done && bidTeam === i ? `has the bid · to ${state.target}` : `to ${state.target}`,
-      }))}
-      onPick=${sum.done ? null : (i) => setBidTeam(i)}
-    />
+    <div class="sheet-wrap" ref=${sheetRef}>
+      <div class="sheet" style="grid-template-columns: repeat(2, 1fr)">
+        ${rounds.map(
+          (r) => html`${[0, 1].map((i) => {
+            const t = r.totals[i];
+            const bidder = r.bidTeam === i;
+            return html`<div class="rcell" style="font-size:15px;padding:6px 4px 5px">
+              ${t}
+              ${bidder
+                ? html`<span class="mark" style=${r.made === false ? "color:var(--loss)" : "color:var(--chalk-dim)"}>
+                    ${r.color ? html`<${Dot} color=${r.color} /> ` : null}bid ${r.bid}${r.made === false ? " · SET" : ""}${r.buried ? ` · ${r.buried} in nest` : ""}
+                  </span>`
+                : null}
+            </div>`;
+          })}`,
+        )}
+        ${[0, 1].map((i) => {
+          const t = state.totals[i];
+          const picked = !sum.done && bidTeam === i;
+          return html`<div class=${`hcell${picked ? " is-picker" : ""}`}>
+            <div class="nm">${state.teams[i]}</div>
+            <div class=${"tot" + (t > 0 ? " pos" : t < 0 ? " neg" : "")}>${t}</div>
+            <div class=${"role" + (picked ? " picker" : "")}>${picked ? "HAS THE BID" : " "}</div>
+            <div class=${"delta" + (preview ? (preview[i] > 0 ? " pos" : preview[i] < 0 ? " neg" : "") : "")}>
+              ${preview ? (preview[i] > 0 ? "+" + preview[i] : preview[i]) : " "}
+            </div>
+            ${sum.done
+              ? null
+              : html`<button type="button" class="tapL" style="width:100%" aria-label=${`${state.teams[i]}: took the bid`} onClick=${() => setBidTeam(i)}></button>`}
+          </div>`;
+        })}
+      </div>
+    </div>
+    <p class="hint-line" style="margin-top:-8px;margin-bottom:12px">Playing to ${state.target} · ${deck}-point deck</p>
     ${sum.done
       ? html`<${OverBanner} line=${sum.line} onRematch=${onRematch} onDone=${onDone} />`
       : html`<div class="card">
-          <h2>${state.teams[bidTeam]} took the bid (tap the scoreboard to switch)</h2>
+          <h2>${state.teams[bidTeam]} took the bid (tap the sheet to switch)</h2>
           <div style="margin-top:10px">
             <${Stepper} label="Bid" value=${bid} min=${rules.minBidFor(deck)} max=${deck} step=${5} onChange=${setBid} />
+          </div>
+          <h2 style="margin-top:12px">Trump color</h2>
+          <div class="btngrid c4">
+            ${rules.COLORS.map(
+              (c) => html`<button type="button" class=${color === c ? "primary" : ""} onClick=${() => setColor(color === c ? null : c)}>
+                <${Dot} color=${c} /> ${c}
+              </button>`,
+            )}
           </div>
           <h2 style="margin-top:12px">Counters the bidding team captured</h2>
           <div class="btngrid c6">
@@ -77,12 +133,14 @@ export function Play({ state, log, dispatch, onRematch, onDone }) {
               (n) => html`<button type="button" class=${captured === n ? "primary" : ""} onClick=${() => setCaptured(n)}>${n}</button>`,
             )}
           </div>
+          <div style="margin-top:12px">
+            <${Stepper} label="Counters buried in the nest" value=${buried} min=${0} max=${75} step=${5} onChange=${setBuried} />
+          </div>
           <button
             type="button" class="primary" style="width:100%;margin-top:12px"
-            disabled=${captured == null}
-            onClick=${() => { dispatch({ type: "hand", bidTeam, bid, captured }); setCaptured(null); setBid(100); }}
-          >${captured == null ? "Score hand" : captured >= bid ? `Made it · +${captured} / +${deck - captured}` : `Set · −${bid} / +${deck - captured}`}</button>
+            disabled=${captured == null || color == null}
+            onClick=${score}
+          >Score hand</button>
         </div>`}
-    <div class="card"><h2>Hands</h2><${LogList} lines=${log} /></div>
   </div>`;
 }

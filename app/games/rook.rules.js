@@ -28,6 +28,8 @@ export const DECKS = [
 
 export const minBidFor = (deck) => (DECKS.find((d) => d.value === deck) || {}).minBid || 70;
 
+export const COLORS = ["red", "yellow", "green", "black"];
+
 export function init(config) {
   return {
     teams: config.teams,
@@ -50,16 +52,18 @@ export function handScore(bidTeam, bid, captured, deck = DECK) {
 
 export function reduce(state, action) {
   if (action.type !== "hand" || state.over) return { state, line: null };
-  const { bidTeam, bid, captured } = action;
+  const { bidTeam, bid, captured, color = null, buried = 0 } = action;
   const { made, delta } = handScore(bidTeam, bid, captured, state.deck || DECK);
   const totals = [state.totals[0] + delta[0], state.totals[1] + delta[1]];
-  const rounds = state.rounds.concat([{ delta, totals: totals.slice() }]);
+  const rounds = state.rounds.concat([
+    { delta, totals: totals.slice(), bidTeam, bid, captured, made, color, buried },
+  ]);
   const stats = structuredClone(state.stats || { sets: [0, 0], maxBids: [0, 0] });
   if (!made) stats.sets[bidTeam] += 1;
   if (made && bid >= (state.deck || DECK)) stats.maxBids[bidTeam] += 1;
   const over =
     (totals[0] >= state.target || totals[1] >= state.target) && totals[0] !== totals[1];
-  const line = `${state.teams[bidTeam]} bid ${bid}, ${made ? `made ${captured}` : `set (took ${captured})`} · ${totals[0]}–${totals[1]}`;
+  const line = `${state.teams[bidTeam]} bid ${bid}${color ? ` ${color}` : ""}, ${made ? `made ${captured}` : `set (took ${captured})`}${buried ? ` · ${buried} in the nest` : ""} · ${totals[0]}–${totals[1]}`;
   return { state: { ...state, totals, rounds, over, stats }, line };
 }
 

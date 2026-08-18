@@ -42,7 +42,8 @@ test("CSP hash matches the inline import map byte for byte", async () => {
   const htmlSrc = readFileSync(new URL("../index.html", import.meta.url), "utf8");
   const map = htmlSrc.match(/<script type="importmap">([\s\S]*?)<\/script>/);
   assert.ok(map, "import map present");
-  const hash = createHash("sha256").update(map[1]).digest("base64");
+  // hash the LF bytes that actually ship: autocrlf checkouts rewrite to CRLF locally
+  const hash = createHash("sha256").update(map[1].replace(/\r\n/g, "\n")).digest("base64");
   assert.ok(htmlSrc.includes(`'sha256-${hash}'`), "CSP hash out of date — see README Develop");
 });
 
@@ -372,6 +373,22 @@ test("rook made and set hands", () => {
   s = rook.reduce(s, { type: "hand", bidTeam: 0, bid: 100, captured: 100 }).state;
   assert.equal(s.over, true);
   assert.match(rook.summary(s).line, /We win 340–20/);
+});
+
+test("rook rounds record color, bid, and buried counters", () => {
+  let s = rook.init({ teams: ["We", "They"], target: 300 });
+  const r = rook.reduce(s, { type: "hand", bidTeam: 1, bid: 95, captured: 100, color: "green", buried: 15 });
+  const round = r.state.rounds[0];
+  assert.equal(round.bidTeam, 1);
+  assert.equal(round.bid, 95);
+  assert.equal(round.color, "green");
+  assert.equal(round.buried, 15);
+  assert.equal(round.made, true);
+  assert.match(r.line, /They bid 95 green, made 100 · 15 in the nest/);
+  // color/buried optional: old-style action still scores
+  const r2 = rook.reduce(s, { type: "hand", bidTeam: 0, bid: 100, captured: 90 });
+  assert.equal(r2.state.rounds[0].color, null);
+  assert.equal(r2.state.rounds[0].buried, 0);
 });
 
 test("rook house deck: 125 points, bids open at 50", () => {
