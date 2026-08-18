@@ -57,9 +57,10 @@ export function Play({ state, dispatch, onRematch, onDone }) {
   const [bidTeam, setBidTeam] = useState(0);
   const [bid, setBid] = useState(100);
   const [color, setColor] = useState(null);
-  const [captured, setCaptured] = useState(null);
-  const [buried, setBuried] = useState(0);
   const deck = state.deck || rules.DECK;
+  const capturedStart = Math.floor(deck / 2 / 5) * 5;
+  const [captured, setCaptured] = useState(capturedStart);
+  const [buried, setBuried] = useState(0);
   const sum = rules.summary(state);
   const rounds = state.rounds || [];
 
@@ -69,12 +70,11 @@ export function Play({ state, dispatch, onRematch, onDone }) {
     if (sheetRef.current) sheetRef.current.scrollTop = sheetRef.current.scrollHeight;
   }, [rounds.length]);
 
-  const preview =
-    !sum.done && captured != null ? rules.handScore(bidTeam, bid, captured, deck).delta : null;
+  const preview = !sum.done ? rules.handScore(bidTeam, bid, captured, deck).delta : null;
 
   const score = () => {
     dispatch({ type: "hand", bidTeam, bid, captured, color, buried });
-    setCaptured(null); setColor(null); setBuried(0); setBid(100);
+    setCaptured(capturedStart); setColor(null); setBuried(0); setBid(100);
   };
 
   return html`<div>
@@ -127,18 +127,15 @@ export function Play({ state, dispatch, onRematch, onDone }) {
               </button>`,
             )}
           </div>
-          <h2 style="margin-top:12px">Counters the bidding team captured</h2>
-          <div class="btngrid c6">
-            ${Array.from({ length: deck / 5 + 1 }, (_, i) => i * 5).map(
-              (n) => html`<button type="button" class=${captured === n ? "primary" : ""} onClick=${() => setCaptured(n)}>${n}</button>`,
-            )}
+          <div style="margin-top:12px">
+            <${Stepper} label="Counters captured" value=${captured} min=${0} max=${deck} step=${5} onChange=${setCaptured} />
           </div>
           <div style="margin-top:12px">
             <${Stepper} label="Counters buried in the nest" value=${buried} min=${0} max=${75} step=${5} onChange=${setBuried} />
           </div>
           <button
             type="button" class="primary" style="width:100%;margin-top:12px"
-            disabled=${captured == null || color == null}
+            disabled=${color == null}
             onClick=${score}
           >Score hand</button>
         </div>`}
