@@ -7,7 +7,7 @@ const ruleFiles = readdirSync(gamesDir).filter((f) => f.endsWith(".rules.js"));
 const modules = await Promise.all(ruleFiles.map((f) => import(new URL(f, gamesDir))));
 
 test("rules modules stay pure and honor the contract", () => {
-  assert.equal(ruleFiles.length, 8);
+  assert.equal(ruleFiles.length, 9);
   for (const f of ruleFiles) {
     const src = readFileSync(new URL(f, gamesDir), "utf8");
     assert.ok(!/from ["'](htm|preact)/.test(src), `${f} imports UI libs`);
@@ -509,6 +509,83 @@ test("games emit structured results for the rivalry ledger", () => {
   const cr = crib.summary(c).result;
   assert.equal(cr.winner, "P1");
   assert.deepEqual(cr.stats["Double skunks"], { P1: 1 });
+});
+
+// ---------- hearts ----------
+import * as hearts from "../app/games/hearts.rules.js";
+
+const heartsGame = (over = {}) => hearts.init({ players: ["P1", "P2", "P3", "P4"], target: 100, ...over });
+
+test("hearts scores the points taken and rotates the deal", () => {
+  let s = heartsGame();
+  s = hearts.reduce(s, { type: "hand", points: [5, 13, 8, 0], queen: 1 }).state;
+  assert.deepEqual(s.totals, [5, 13, 8, 0]);
+  assert.equal(s.dealer, 1);
+  assert.equal(s.hands, 1);
+  assert.equal(s.rows[0].queen, 1);
+  assert.equal(s.rows[0].moon, null);
+  assert.equal(s.stats.queens.P2, 1);
+  assert.equal(s.stats.cleans.P4, 1);
+  // the sheet row keeps the hand's own points next to the running total
+  assert.deepEqual(s.rows[0].points, [5, 13, 8, 0]);
+});
+
+test("hearts shooting the moon: the shooter takes nothing, everyone else takes 26", () => {
+  let s = heartsGame();
+  s = hearts.reduce(s, { type: "hand", points: [0, 26, 0, 0], queen: 1 }).state;
+  assert.deepEqual(s.totals, [26, 0, 26, 26]);
+  assert.equal(s.rows[0].moon, 1);
+  assert.equal(s.stats.moons.P2, 1);
+  assert.match(hearts.summary(s).line, /P2 low with 0/);
+  // handDeltas is the whole rule, and it is the identity when nobody moons
+  assert.deepEqual(hearts.handDeltas([26, 0, 0, 0]), [0, 26, 26, 26]);
+  assert.deepEqual(hearts.handDeltas([1, 12, 13, 0]), [1, 12, 13, 0]);
+});
+
+test("hearts refuses any hand that does not account for all 26 points", () => {
+  const s = heartsGame();
+  for (const bad of [[5, 5, 5, 5], [26, 1, 0, 0], [6, 7, 13], [1.5, 11.5, 13, 0], [-1, 14, 13, 0]]) {
+    assert.equal(hearts.reduce(s, { type: "hand", points: bad }).state, s, JSON.stringify(bad));
+  }
+  assert.equal(hearts.validPoints([13, 13, 0, 0], 4), true);
+  assert.equal(hearts.validPoints([13, 13, 0], 4), false);
+});
+
+test("hearts ends at the target, and a tie at the bottom plays on", () => {
+  let s = heartsGame({ target: 50 });
+  let last;
+  for (let i = 0; i < 4; i++) {
+    last = hearts.reduce(s, { type: "hand", points: [0, 0, 13, 13], queen: 3 });
+    s = last.state;
+  }
+  assert.deepEqual(s.totals, [0, 0, 52, 52]);
+  assert.equal(s.over, false); // P3 and P4 are past 50, but P1 and P2 are tied at 0
+  assert.match(last.line, /tied at 0, play on/);
+  s = hearts.reduce(s, { type: "hand", points: [1, 12, 13, 0], queen: 2 }).state;
+  assert.deepEqual(s.totals, [1, 12, 65, 52]);
+  assert.equal(s.over, true);
+  const sum = hearts.summary(s);
+  assert.equal(sum.done, true);
+  assert.match(sum.line, /P1 wins with 1/);
+  assert.equal(sum.result.winner, "P1");
+  // a finished game takes no more hands
+  assert.equal(hearts.reduce(s, { type: "hand", points: [26, 0, 0, 0], queen: 0 }).state, s);
+});
+
+test("hearts pass rotation drops the across pass at an odd table", () => {
+  assert.deepEqual([0, 1, 2, 3, 4].map((h) => hearts.passDirection(h, 4)), [
+    "left", "right", "across", "hold", "left",
+  ]);
+  assert.deepEqual([0, 1, 2, 3].map((h) => hearts.passDirection(h, 3)), ["left", "right", "hold", "left"]);
+});
+
+test("hearts misdeal throws the hand in without scoring or moving the deal", () => {
+  let s = heartsGame();
+  const r = hearts.reduce(s, { type: "misdeal" });
+  assert.deepEqual(r.state.totals, [0, 0, 0, 0]);
+  assert.equal(r.state.hands, 0);
+  assert.equal(r.state.dealer, 0);
+  assert.match(r.line, /thrown in/);
 });
 
 // ---------- rivalry aggregation ----------

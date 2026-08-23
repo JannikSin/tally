@@ -2,11 +2,12 @@
 
 Scorekeeper PWA for table games. You bring the cards; this keeps the score.
 
-Eight games, each with its own purpose-built scoring surface:
+Nine games, each with its own purpose-built scoring surface:
 
 - **Euchre** — teams to 10; made / march / loner / euchred one-tap entry
 - **Cribbage** — peg to 121 on a board shaped like the number 29 (the perfect hand), skunk and double-skunk lines included
 - **Sheepshead** — picker/partner shares, schneider and schwarz buckets, leasters, zero-sum standings
+- **Hearts** — hand sheet with the dealer mark and pass direction; count the hearts, place the queen, shoot the moon
 - **Oh Hell** — auto round sequence, bid and trick phases with dealer-hook warning, two scoring presets
 - **Gin Rummy** — knock / gin / big gin / undercut, boxes, game bonus, shutout doubling
 - **Bridge** — full rubber scoring on the classic above/below-the-line pad: vulnerability, doubles, slams, honors, rubber bonuses

@@ -411,6 +411,13 @@ input[type="text"], input[type="number"] {
 .sheet .rcell .mark.picker { color: var(--brass); }
 .sheet .rcell .mark.partner { color: var(--sky); }
 .sheet .rcell .mark.dealer { color: var(--chalk-dim); }
+/* hearts: the hand's own points in the corner, the queen and the moon as marks */
+.sheet .rcell .corner.tl.hand { color: var(--loss); font-family: var(--mono); }
+.sheet .rcell .mark.queen { color: var(--sky); }
+.sheet .rcell .mark.moon { color: var(--brass); }
+.sheet .hcell .role.queen { color: var(--sky); }
+.sheet .hcell .role.moon { color: var(--brass); }
+.sheet .hcell .delta.pain { color: var(--loss); }
 
 /* ---------- confetti (win only) ---------- */
 .confetti {

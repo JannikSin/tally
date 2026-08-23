@@ -11,8 +11,9 @@ import * as sheepshead from "./games/sheepshead.js";
 import * as rook from "./games/rook.js";
 import * as bridge from "./games/bridge.js";
 import * as mahjong from "./games/mahjong.js";
+import * as hearts from "./games/hearts.js";
 
-const GAMES = [euchre, cribbage, sheepshead, ohhell, gin, bridge, rook, mahjong];
+const GAMES = [euchre, cribbage, sheepshead, hearts, ohhell, gin, bridge, rook, mahjong];
 
 function useHash() {
   const [hash, setHash] = useState(location.hash.slice(1));
@@ -38,7 +39,7 @@ function Home() {
         const s = store.session(g.meta.id);
         const sum = s ? g.rules.summary(s.state) : null;
         return html`<button class="tile" onClick=${() => (location.hash = g.meta.id)}>
-          <span class="glyph" style=${g.meta.tint ? `color:var(--${g.meta.tint === "brass" ? "brass" : "sky"});font-weight:700` : ""}>${g.meta.glyph}</span>
+          <span class="glyph" style=${g.meta.tint ? `color:var(--${g.meta.tint});font-weight:700` : ""}>${g.meta.glyph}</span>
           <span class="name">${g.meta.name}</span>
           ${s
             ? html`<span class="resume">${sum.done ? "Finished" : "Resume"}</span>
