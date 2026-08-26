@@ -2,12 +2,13 @@
 //   vendor/ + icons/  -> cache-first (immutable, versioned by CACHE bump)
 //   everything else (shell, app/) -> network-first, fallback to cache
 // Bump CACHE on every deploy that touches precached files.
-const CACHE = "tally-v13";
+const CACHE = "tally-v14";
 
 // Manual list â€” nothing derives this from the filesystem. Every shipped file
 // under app/, app/games/, vendor/, and icons/ must be added here by hand,
 // or the app silently breaks offline for anyone who installed it.
 const PRECACHE = [
+  "./suggest.css",
   "./suggest.js",
   "./",
   "./index.html",
