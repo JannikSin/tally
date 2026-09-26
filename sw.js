@@ -2,7 +2,7 @@
 //   vendor/ + icons/  -> cache-first (immutable, versioned by CACHE bump)
 //   everything else (shell, app/) -> network-first, fallback to cache
 // Bump CACHE on every deploy that touches precached files.
-const CACHE = "tally-v14";
+const CACHE = "tally-v15";
 
 // Manual list â€” nothing derives this from the filesystem. Every shipped file
 // under app/, app/games/, vendor/, and icons/ must be added here by hand,
