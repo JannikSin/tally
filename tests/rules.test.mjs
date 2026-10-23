@@ -545,6 +545,7 @@ test("hearts shooting the moon: the shooter takes nothing, everyone else takes 2
   assert.deepEqual(s.totals, [26, 0, 26, 26]);
   assert.equal(s.rows[0].moon, 1);
   assert.equal(s.stats.moons.P2, 1);
+  assert.deepEqual(s.stats.cleans, {}); // taking 26 is not a clean hand
   assert.match(hearts.summary(s).line, /P2 low with 0/);
   // handDeltas is the whole rule, and it is the identity when nobody moons
   assert.deepEqual(hearts.handDeltas([26, 0, 0, 0]), [0, 26, 26, 26]);

@@ -101,8 +101,10 @@ export function Play({ state, dispatch, onRematch, onDone, onUndo, canUndo }) {
   return html`<div>
     <div class="sheet-wrap" ref=${sheetRef}>
       <div class="sheet" style=${`grid-template-columns: repeat(${n}, minmax(64px, 1fr))`}>
-        ${rows.map((r) => state.players.map((_, i) => html`<div class="rcell">
-          ${r.points[i] ? html`<span class="corner tl hand">+${r.points[i]}</span>` : null}
+        ${rows.map((r) => {
+          const d = rules.handDeltas(r.points); // on a moon the corner shows what the total moved, not raw points
+          return state.players.map((_, i) => html`<div class="rcell">
+          ${d[i] ? html`<span class="corner tl hand">+${d[i]}</span>` : null}
           ${r.dealer === i ? html`<span class="corner tr">D</span>` : null}
           ${r.totals[i]}
           ${r.moon === i
@@ -110,7 +112,8 @@ export function Play({ state, dispatch, onRematch, onDone, onUndo, canUndo }) {
             : r.queen === i
               ? html`<span class="mark queen">Q♠</span>`
               : null}
-        </div>`))}
+        </div>`);
+        })}
         ${state.players.map((p, i) => {
           // the brass leader tint only means something once a hand has been scored
           const tint = state.hands > 0 && state.totals[i] === low ? "color:var(--brass)" : "";
