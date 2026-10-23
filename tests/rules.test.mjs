@@ -340,6 +340,22 @@ test("oh hell full game flow", () => {
   assert.equal(after.state, s);
 });
 
+test("oh hell: a tie at the top is a tie, not a win for the first seat", () => {
+  let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
+  s = oh.reduce(s, { type: "bids", bids: [0, 1, 0] }).state;
+  s = oh.reduce(s, { type: "tricks", tricks: [0, 0, 1] }).state;
+  assert.deepEqual(s.totals, [10, 0, 0]); // P1 alone on top, still a win
+  assert.equal(oh.summary(s).result.winner, "P1");
+  s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
+  s = oh.reduce(s, { type: "bids", bids: [0, 0, 0] }).state;
+  s = oh.reduce(s, { type: "tricks", tricks: [0, 0, 1] }).state;
+  assert.deepEqual(s.totals, [10, 10, 0]);
+  const sum = oh.summary(s);
+  assert.equal(sum.done, true);
+  assert.equal(sum.result.winner, null);
+  assert.match(sum.line, /P1 & P2 tied at 10/);
+});
+
 test("oh hell misdeal skip voids the round in place", () => {
   let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 3, mode: "down", scoring: "exact10" });
   s = oh.reduce(s, { type: "bids", bids: [1, 1, 0] }).state;

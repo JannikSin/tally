@@ -84,7 +84,9 @@ export function reduce(state, action) {
 
 export function summary(state) {
   const best = Math.max(...state.totals);
-  const winner = state.players[state.totals.indexOf(best)];
+  const top = state.players.filter((_, i) => state.totals[i] === best);
+  // a shared top score is a tie, never a win for whoever is listed first
+  const winner = top.length === 1 ? top[0] : null;
   const exacts = state.exacts || state.players.map(() => 0);
   const result = {
     participants: state.players.slice(),
@@ -93,12 +95,13 @@ export function summary(state) {
       "Exact bids": Object.fromEntries(state.players.map((p, i) => [p, exacts[i]])),
     },
   };
+  const tied = `${top.join(" & ")} tied at ${best}`;
   if (state.over) {
-    return { done: true, line: `${winner} wins with ${best}`, result };
+    return { done: true, line: winner ? `${winner} wins with ${best}` : tied, result };
   }
   return {
     done: false,
-    line: `Round ${state.round + 1}/${state.seq.length} · ${winner} leads ${best}`,
+    line: `Round ${state.round + 1}/${state.seq.length} · ${winner ? `${winner} leads ${best}` : tied}`,
     result,
   };
 }
