@@ -88,6 +88,15 @@ test("euchre winner-first line and alone tag", () => {
   assert.match(euchre.summary(s).line, /They win 2–0/); // winner's score first
 });
 
+test("euchre Went alone + March scores as a loner march", () => {
+  const s = euchre.init({ teams: ["We", "They"], target: 10 });
+  const r = euchre.reduce(s, { type: "hand", makers: 0, result: "march", alone: true });
+  assert.deepEqual(r.state.score, [4, 0]);
+  assert.deepEqual(r.state.stats.loners, [1, 0]);
+  assert.deepEqual(r.state.stats.marches, [0, 0]);
+  assert.match(r.line, /^We loner march, We \+4/);
+});
+
 // ---------- bridge ----------
 import * as bridge from "../app/games/bridge.rules.js";
 
