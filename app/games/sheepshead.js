@@ -56,6 +56,7 @@ export function Play({ state, dispatch, onDone, onUndo, canUndo }) {
   const sitting = rules.autoSitters(n, dealer); // no exceptions, no overrides
   const active = state.players.map((_, i) => i).filter((i) => !sitting.includes(i));
   const [picker, setPicker] = useState(null);
+  const [confirmDone, setConfirmDone] = useState(false);
   const [partner, setPartner] = useState(null); // same player as picker = going alone
   const [won, setWon] = useState(null); // true | false | null; Won and Lost exclusive
   const [mod, setMod] = useState(null); // "schneider" | "trick" | null; exclusive pair
@@ -209,6 +210,11 @@ export function Play({ state, dispatch, onDone, onUndo, canUndo }) {
         <button type="button" class="primary grow" disabled=${!canScore} onClick=${scoreHand}>Score hand</button>
       </div>
     </div>
-    <button type="button" style="width:100%" onClick=${onDone}>Finish session</button>
+    <button type="button" class=${confirmDone ? "primary" : ""} style="width:100%"
+      onClick=${() => {
+        if (confirmDone) onDone(); // ends the session: same two-tap guard as the shell's ✕
+        else { setConfirmDone(true); setTimeout(() => setConfirmDone(false), 3500); }
+      }}
+    >${confirmDone ? "End session? Tap again" : "Finish session"}</button>
   </div>`;
 }
