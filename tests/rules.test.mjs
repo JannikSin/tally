@@ -88,6 +88,19 @@ test("euchre winner-first line and alone tag", () => {
   assert.match(euchre.summary(s).line, /They win 2–0/); // winner's score first
 });
 
+test("euchre went alone plus march scores as a loner march", () => {
+  const s = euchre.init({ teams: ["We", "They"] });
+  const r = euchre.reduce(s, { type: "hand", makers: 0, result: "march", alone: true });
+  assert.deepEqual(r.state.score, [4, 0]);
+  assert.deepEqual(r.state.stats.loners, [1, 0]);
+  assert.deepEqual(r.state.stats.marches, [0, 0]);
+  assert.match(r.line, /We loner march, We \+4/);
+  // the loner button with the toggle on is not double-tagged
+  const l = euchre.reduce(s, { type: "hand", makers: 1, result: "loner", alone: true });
+  assert.deepEqual(l.state.score, [0, 4]);
+  assert.match(l.line, /They loner march/);
+});
+
 // ---------- bridge ----------
 import * as bridge from "../app/games/bridge.rules.js";
 
