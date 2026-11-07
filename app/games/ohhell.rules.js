@@ -82,9 +82,16 @@ export function reduce(state, action) {
   return { state, line: null };
 }
 
+// "P1", "P1 and P2", "P1, P2 and P3"
+function names(list) {
+  return list.length < 2 ? list.join("") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
+}
+
 export function summary(state) {
   const best = Math.max(...state.totals);
-  const winner = state.players[state.totals.indexOf(best)];
+  // a tie at the top names every tied seat and records no winner (as sheepshead does)
+  const top = state.players.filter((_, i) => state.totals[i] === best);
+  const winner = top.length === 1 ? top[0] : null;
   const exacts = state.exacts || state.players.map(() => 0);
   const result = {
     participants: state.players.slice(),
@@ -94,11 +101,12 @@ export function summary(state) {
     },
   };
   if (state.over) {
-    return { done: true, line: `${winner} wins with ${best}`, result };
+    const line = winner ? `${winner} wins with ${best}` : `${names(top)} tie with ${best}`;
+    return { done: true, line, result };
   }
   return {
     done: false,
-    line: `Round ${state.round + 1}/${state.seq.length} · ${winner} leads ${best}`,
+    line: `Round ${state.round + 1}/${state.seq.length} · ${winner ? `${winner} leads` : `${names(top)} tied at`} ${best}`,
     result,
   };
 }

@@ -331,6 +331,28 @@ test("oh hell full game flow", () => {
   assert.equal(after.state, s);
 });
 
+test("oh hell tie for first records no winner", () => {
+  let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
+  s = oh.reduce(s, { type: "bids", bids: [1, 1, 0] }).state;
+  assert.match(oh.summary(s).line, /P1, P2 and P3 tied at 0/);
+  s = oh.reduce(s, { type: "tricks", tricks: [1, 0, 0] }).state;
+  // P1 11, P2 0, P3 10: no tie
+  assert.equal(oh.summary(s).result.winner, "P1");
+  let t = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
+  t = oh.reduce(t, { type: "bids", bids: [0, 0, 1] }).state;
+  t = oh.reduce(t, { type: "tricks", tricks: [0, 0, 1] }).state;
+  // P1 10, P2 10, P3 11: P3 wins outright
+  assert.equal(oh.summary(t).result.winner, "P3");
+  let u = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
+  u = oh.reduce(u, { type: "bids", bids: [0, 0, 0] }).state;
+  u = oh.reduce(u, { type: "tricks", tricks: [0, 0, 1] }).state;
+  // P1 10, P2 10, P3 0: tie at the top
+  const sum = oh.summary(u);
+  assert.equal(sum.done, true);
+  assert.equal(sum.result.winner, null);
+  assert.match(sum.line, /P1 and P2 tie with 10/);
+});
+
 test("oh hell misdeal skip voids the round in place", () => {
   let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 3, mode: "down", scoring: "exact10" });
   s = oh.reduce(s, { type: "bids", bids: [1, 1, 0] }).state;
