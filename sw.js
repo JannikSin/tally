@@ -73,6 +73,7 @@ self.addEventListener("fetch", (e) => {
         (hit) =>
           hit ||
           fetch(e.request).then((res) => {
+            if (!res.ok) return res; // never cache an error page
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put(e.request, copy));
             return res;
@@ -85,6 +86,9 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     fetch(e.request)
       .then((res) => {
+        // a 404/5xx from Pages must not overwrite the good cached copy; serve
+        // that copy instead when there is one, else pass the error through
+        if (!res.ok) return caches.match(e.request).then((hit) => hit || res);
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
         return res;
