@@ -23,8 +23,9 @@ function validate(data) {
     }
   }
   if (!isPlainObject(data.history)) data.history = {};
-  for (const v of Object.values(data.history)) {
+  for (const [k, v] of Object.entries(data.history)) {
     if (!Array.isArray(v)) throw new Error("bad history");
+    data.history[k] = v.filter(isPlainObject); // a null entry would crash Rivalries
   }
   data.roster = data.roster.filter((x) => typeof x === "string");
   return data;

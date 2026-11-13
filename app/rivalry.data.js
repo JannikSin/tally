@@ -9,7 +9,7 @@ export function aggregate(history, gameMeta) {
   const map = new Map();
   for (const [gameId, entries] of Object.entries(history || {})) {
     for (const e of entries || []) {
-      const r = e.result;
+      const r = e && e.result;
       if (!r || !Array.isArray(r.participants) || r.participants.length < 2) continue;
       const key = gameId + "|" + r.participants.slice().sort().join("|");
       let m = map.get(key);

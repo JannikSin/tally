@@ -660,4 +660,8 @@ test("store survives corrupt and truncated data", async () => {
   assert.throws(() => store.importJSON('{"schema":1,"games":{},"roster":[],"history":{"euchre":"junk"}}'));
   store.importJSON('{"schema":1,"games":{},"roster":[{"evil":1},"P-Ok"],"history":{}}');
   assert.deepEqual(store.roster(), ["P-Ok"]);
+  // null history entries are dropped on restore, and aggregate tolerates them
+  store.importJSON('{"schema":1,"games":{},"roster":[],"history":{"euchre":[null,{"date":1,"line":"x"}]}}');
+  assert.equal(store.history("euchre").length, 1);
+  assert.doesNotThrow(() => riv.aggregate({ euchre: [null] }, {}));
 });

@@ -37,7 +37,12 @@ function Home() {
     <div class="tiles">
       ${GAMES.map((g) => {
         const s = store.session(g.meta.id);
-        const sum = s ? g.rules.summary(s.state) : null;
+        // a saved state the rules can't read (old schema, bad restore) must not
+        // blank the home screen on every boot: show Resume with no summary line
+        let sum = null;
+        if (s) {
+          try { sum = g.rules.summary(s.state); } catch { sum = { done: false, line: "" }; }
+        }
         return html`<button class="tile" onClick=${() => (location.hash = g.meta.id)}>
           <span class="glyph" style=${g.meta.tint ? `color:var(--${g.meta.tint});font-weight:700` : ""}>${g.meta.glyph}</span>
           <span class="name">${g.meta.name}</span>
