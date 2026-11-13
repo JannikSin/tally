@@ -84,7 +84,9 @@ export function reduce(state, action) {
 
 export function summary(state) {
   const best = Math.max(...state.totals);
-  const winner = state.players[state.totals.indexOf(best)];
+  const leaders = state.players.filter((_, i) => state.totals[i] === best);
+  // a tie at the top has no winner (same rule as sheepshead), never seat order
+  const winner = leaders.length === 1 ? leaders[0] : null;
   const exacts = state.exacts || state.players.map(() => 0);
   const result = {
     participants: state.players.slice(),
@@ -94,11 +96,13 @@ export function summary(state) {
     },
   };
   if (state.over) {
-    return { done: true, line: `${winner} wins with ${best}`, result };
+    const end = winner ? `${winner} wins with ${best}` : `${leaders.join(", ")} tied at ${best}`;
+    return { done: true, line: end, result };
   }
+  const lead = winner ? `${winner} leads ${best}` : `${leaders.join(", ")} tied at ${best}`;
   return {
     done: false,
-    line: `Round ${state.round + 1}/${state.seq.length} · ${winner} leads ${best}`,
+    line: `Round ${state.round + 1}/${state.seq.length} · ${lead}`,
     result,
   };
 }
