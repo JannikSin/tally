@@ -2,7 +2,7 @@
 //   vendor/ + icons/  -> cache-first (immutable, versioned by CACHE bump)
 //   everything else (shell, app/) -> network-first, fallback to cache
 // Bump CACHE on every deploy that touches precached files.
-const CACHE = "tally-v15";
+const CACHE = "tally-v16";
 
 // Manual list â€” nothing derives this from the filesystem. Every shipped file
 // under app/, app/games/, vendor/, and icons/ must be added here by hand,
@@ -73,8 +73,10 @@ self.addEventListener("fetch", (e) => {
         (hit) =>
           hit ||
           fetch(e.request).then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(e.request, copy));
+            }
             return res;
           }),
       ),
@@ -85,8 +87,11 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy));
+        // never let a transient 404/5xx (mid-deploy) overwrite a good cached copy
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+        }
         return res;
       })
       .catch(() =>
