@@ -91,7 +91,9 @@ export function reduce(state, action) {
       const qp = state.players[queen];
       stats.queens[qp] = (stats.queens[qp] || 0) + 1;
     }
-    points.forEach((p, i) => {
+    // a moon hand is clean for nobody: the shooter took every heart and the
+    // table just ate 26 each, even though their raw points read 0
+    if (moon < 0) points.forEach((p, i) => {
       if (p === 0) {
         const name = state.players[i];
         stats.cleans[name] = (stats.cleans[name] || 0) + 1;
