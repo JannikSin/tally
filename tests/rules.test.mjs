@@ -326,6 +326,11 @@ test("oh hell full game flow", () => {
   assert.equal(s.over, true);
   assert.deepEqual(s.totals, [21, 11, 20]);
   assert.match(oh.summary(s).line, /P1 wins with 21/);
+  assert.equal(oh.summary(s).result.winner, "P1");
+  // a shared top total is a tie: no winner, no rivalry credit for the first seat
+  const tie = oh.summary({ ...s, totals: [21, 11, 21] });
+  assert.equal(tie.result.winner, null);
+  assert.match(tie.line, /Tied at 21/);
   // over-guard: further actions are no-ops
   const after = oh.reduce(s, { type: "bids", bids: [0, 0, 0] });
   assert.equal(after.state, s);
