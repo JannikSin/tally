@@ -55,7 +55,7 @@ export function reduce(state, action) {
   const { bidTeam, bid, captured, color = null, buried = 0 } = action;
   const { made, delta } = handScore(bidTeam, bid, captured, state.deck || DECK);
   const totals = [state.totals[0] + delta[0], state.totals[1] + delta[1]];
-  const rounds = state.rounds.concat([
+  const rounds = (state.rounds || []).concat([ // games saved before the hand sheet have no rounds
     { delta, totals: totals.slice(), bidTeam, bid, captured, made, color, buried },
   ]);
   const stats = structuredClone(state.stats || { sets: [0, 0], maxBids: [0, 0] });

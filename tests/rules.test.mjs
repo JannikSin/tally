@@ -430,6 +430,14 @@ test("rook rounds record color, bid, and buried counters", () => {
   assert.equal(r2.state.rounds[0].buried, 0);
 });
 
+test("rook still scores a game saved before rounds existed", () => {
+  const old = rook.init({ teams: ["We", "They"], target: 300 });
+  delete old.rounds;
+  const r = rook.reduce(old, { type: "hand", bidTeam: 0, bid: 100, captured: 105 });
+  assert.deepEqual(r.state.totals, [105, 15]);
+  assert.equal(r.state.rounds.length, 1);
+});
+
 test("rook house deck: 125 points, bids open at 50", () => {
   assert.deepEqual(rook.handScore(0, 50, 60, 125), { made: true, delta: [60, 65] });
   assert.deepEqual(rook.handScore(1, 85, 80, 125), { made: false, delta: [45, -85] });
