@@ -88,13 +88,17 @@ test("euchre winner-first line and alone tag", () => {
   assert.match(euchre.summary(s).line, /They win 2–0/); // winner's score first
 });
 
-test("euchre: Went alone + March scores as a loner march", () => {
-  const s = euchre.init({ teams: ["We", "They"], target: 10 });
+test("euchre went alone plus march scores as a loner march", () => {
+  const s = euchre.init({ teams: ["We", "They"] });
   const r = euchre.reduce(s, { type: "hand", makers: 0, result: "march", alone: true });
   assert.deepEqual(r.state.score, [4, 0]);
   assert.deepEqual(r.state.stats.loners, [1, 0]);
   assert.deepEqual(r.state.stats.marches, [0, 0]);
   assert.match(r.line, /We loner march, We \+4/);
+  // the loner button with the toggle on is not double-tagged
+  const l = euchre.reduce(s, { type: "hand", makers: 1, result: "loner", alone: true });
+  assert.deepEqual(l.state.score, [0, 4]);
+  assert.match(l.line, /They loner march/);
 });
 
 // ---------- bridge ----------
@@ -340,20 +344,26 @@ test("oh hell full game flow", () => {
   assert.equal(after.state, s);
 });
 
-test("oh hell: a tie at the top is a tie, not a win for the first seat", () => {
+test("oh hell tie for first records no winner", () => {
   let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
-  s = oh.reduce(s, { type: "bids", bids: [0, 1, 0] }).state;
-  s = oh.reduce(s, { type: "tricks", tricks: [0, 0, 1] }).state;
-  assert.deepEqual(s.totals, [10, 0, 0]); // P1 alone on top, still a win
+  s = oh.reduce(s, { type: "bids", bids: [1, 1, 0] }).state;
+  assert.match(oh.summary(s).line, /P1, P2 and P3 tied at 0/);
+  s = oh.reduce(s, { type: "tricks", tricks: [1, 0, 0] }).state;
+  // P1 11, P2 0, P3 10: no tie
   assert.equal(oh.summary(s).result.winner, "P1");
-  s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
-  s = oh.reduce(s, { type: "bids", bids: [0, 0, 0] }).state;
-  s = oh.reduce(s, { type: "tricks", tricks: [0, 0, 1] }).state;
-  assert.deepEqual(s.totals, [10, 10, 0]);
-  const sum = oh.summary(s);
+  let t = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
+  t = oh.reduce(t, { type: "bids", bids: [0, 0, 1] }).state;
+  t = oh.reduce(t, { type: "tricks", tricks: [0, 0, 1] }).state;
+  // P1 10, P2 10, P3 11: P3 wins outright
+  assert.equal(oh.summary(t).result.winner, "P3");
+  let u = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
+  u = oh.reduce(u, { type: "bids", bids: [0, 0, 0] }).state;
+  u = oh.reduce(u, { type: "tricks", tricks: [0, 0, 1] }).state;
+  // P1 10, P2 10, P3 0: tie at the top
+  const sum = oh.summary(u);
   assert.equal(sum.done, true);
   assert.equal(sum.result.winner, null);
-  assert.match(sum.line, /P1 & P2 tied at 10/);
+  assert.match(sum.line, /P1 and P2 tie with 10/);
 });
 
 test("oh hell misdeal skip voids the round in place", () => {

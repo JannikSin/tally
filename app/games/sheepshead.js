@@ -66,6 +66,9 @@ export function Play({ state, dispatch, onDone, onUndo, canUndo }) {
   const pendingDouble = state.pendingDouble || 1;
   const rows = state.rows || [];
   const clearSel = () => { setPicker(null); setPartner(null); setWon(null); setMod(null); setLeaster(false); setDouble(1); };
+  // Undo (or any hand change) can move the dealer and so who sits out: never
+  // carry a picker or partner across that, as hearts and Oh Hell already do
+  useEffect(clearSel, [state.hands, dealer]);
 
   // hands stack upward: the newest row sits just above the header, scroll up
   // through the sheet for the early hands
