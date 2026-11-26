@@ -31,6 +31,7 @@ export function Play({ state, log, dispatch, onDone }) {
   const [mode, setMode] = useState("collect");
   const [winner, setWinner] = useState(null);
   const [amount, setAmount] = useState("");
+  const [confirmDone, setConfirmDone] = useState(false);
   const [deltas, setDeltas] = useState(Array(n).fill(""));
   // signs live in chips, not the keyboard: the iOS numeric pad has no minus key
   const [signs, setSigns] = useState(Array(n).fill(1));
@@ -127,6 +128,11 @@ export function Play({ state, log, dispatch, onDone }) {
       </div>
     </div>
     <div class="card"><h2>Hands</h2><${LogList} lines=${log} /></div>
-    <button type="button" style="width:100%" onClick=${onDone}>Finish session</button>
+    <button type="button" class=${confirmDone ? "primary" : ""} style="width:100%"
+      onClick=${() => {
+        if (confirmDone) onDone(); // ends the session: same two-tap guard as the shell's ✕
+        else { setConfirmDone(true); setTimeout(() => setConfirmDone(false), 3500); }
+      }}
+    >${confirmDone ? "End session? Tap again" : "Finish session"}</button>
   </div>`;
 }
