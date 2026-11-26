@@ -133,4 +133,5 @@ export const store = {
   },
 };
 
-if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
+// typeof guard: Node 20 and older have no navigator global, so the store tests import cleanly
+if (typeof navigator !== "undefined" && navigator.storage?.persist) navigator.storage.persist().catch(() => {});
