@@ -612,6 +612,16 @@ test("hearts ends at the target, and a tie at the bottom plays on", () => {
   assert.equal(hearts.reduce(s, { type: "hand", points: [26, 0, 0, 0], queen: 0 }).state, s);
 });
 
+test("hearts summary never shows a negative to-go while a bottom tie plays on", () => {
+  let s = heartsGame({ target: 50 });
+  for (let i = 0; i < 4; i++) s = hearts.reduce(s, { type: "hand", points: [0, 0, 13, 13], queen: 3 }).state;
+  assert.equal(s.over, false);
+  const line = hearts.summary(s).line;
+  assert.match(line, /tied at the bottom, play on/);
+  assert.doesNotMatch(line, /-\d+ to go/);
+  assert.match(hearts.summary(heartsGame()).line, /100 to go/);
+});
+
 test("hearts pass rotation drops the across pass at an odd table", () => {
   assert.deepEqual([0, 1, 2, 3, 4].map((h) => hearts.passDirection(h, 4)), [
     "left", "right", "across", "hold", "left",

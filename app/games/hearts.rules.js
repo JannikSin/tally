@@ -137,9 +137,11 @@ export function summary(state) {
     return { done: true, line: `${ranked[0].p} wins with ${ranked[0].t}`, result };
   }
   const high = Math.max(...state.totals);
+  // past the target but tied at the bottom: no "-N to go", the table plays on
+  const togo = high >= state.target ? "tied at the bottom, play on" : `${state.target - high} to go`;
   return {
     done: false,
-    line: `${state.hands} hand${state.hands === 1 ? "" : "s"}: ${ranked[0].p} low with ${ranked[0].t} · ${state.target - high} to go`,
+    line: `${state.hands} hand${state.hands === 1 ? "" : "s"}: ${ranked[0].p} low with ${ranked[0].t} · ${togo}`,
     result,
   };
 }
