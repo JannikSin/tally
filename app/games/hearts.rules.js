@@ -91,7 +91,8 @@ export function reduce(state, action) {
       const qp = state.players[queen];
       stats.queens[qp] = (stats.queens[qp] || 0) + 1;
     }
-    points.forEach((p, i) => {
+    // a moon is no clean hand for the three who just took 26 each
+    if (moon < 0) points.forEach((p, i) => {
       if (p === 0) {
         const name = state.players[i];
         stats.cleans[name] = (stats.cleans[name] || 0) + 1;

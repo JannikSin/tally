@@ -88,6 +88,15 @@ test("euchre winner-first line and alone tag", () => {
   assert.match(euchre.summary(s).line, /They win 2–0/); // winner's score first
 });
 
+test("euchre: Went alone + March scores as a loner march", () => {
+  const s = euchre.init({ teams: ["We", "They"], target: 10 });
+  const r = euchre.reduce(s, { type: "hand", makers: 0, result: "march", alone: true });
+  assert.deepEqual(r.state.score, [4, 0]);
+  assert.deepEqual(r.state.stats.loners, [1, 0]);
+  assert.deepEqual(r.state.stats.marches, [0, 0]);
+  assert.match(r.line, /We loner march, We \+4/);
+});
+
 // ---------- bridge ----------
 import * as bridge from "../app/games/bridge.rules.js";
 
@@ -331,6 +340,22 @@ test("oh hell full game flow", () => {
   assert.equal(after.state, s);
 });
 
+test("oh hell: a tie at the top is a tie, not a win for the first seat", () => {
+  let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
+  s = oh.reduce(s, { type: "bids", bids: [0, 1, 0] }).state;
+  s = oh.reduce(s, { type: "tricks", tricks: [0, 0, 1] }).state;
+  assert.deepEqual(s.totals, [10, 0, 0]); // P1 alone on top, still a win
+  assert.equal(oh.summary(s).result.winner, "P1");
+  s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 1, mode: "down", scoring: "exact10" });
+  s = oh.reduce(s, { type: "bids", bids: [0, 0, 0] }).state;
+  s = oh.reduce(s, { type: "tricks", tricks: [0, 0, 1] }).state;
+  assert.deepEqual(s.totals, [10, 10, 0]);
+  const sum = oh.summary(s);
+  assert.equal(sum.done, true);
+  assert.equal(sum.result.winner, null);
+  assert.match(sum.line, /P1 & P2 tied at 10/);
+});
+
 test("oh hell misdeal skip voids the round in place", () => {
   let s = oh.init({ players: ["P1", "P2", "P3"], maxCards: 3, mode: "down", scoring: "exact10" });
   s = oh.reduce(s, { type: "bids", bids: [1, 1, 0] }).state;
@@ -536,6 +561,7 @@ test("hearts shooting the moon: the shooter takes nothing, everyone else takes 2
   assert.deepEqual(s.totals, [26, 0, 26, 26]);
   assert.equal(s.rows[0].moon, 1);
   assert.equal(s.stats.moons.P2, 1);
+  assert.deepEqual(s.stats.cleans, {}); // taking 26 is not a clean hand
   assert.match(hearts.summary(s).line, /P2 low with 0/);
   // handDeltas is the whole rule, and it is the identity when nobody moons
   assert.deepEqual(hearts.handDeltas([26, 0, 0, 0]), [0, 26, 26, 26]);

@@ -28,16 +28,18 @@ export const RESULTS = [
 
 export function reduce(state, action) {
   if (action.type !== "hand" || summary(state).done) return { state, line: null };
-  const r = RESULTS.find((x) => x.key === action.result);
+  // "Went alone" + March is a loner march: it pays 4, not 2
+  const key = action.alone && action.result === "march" ? "loner" : action.result;
+  const r = RESULTS.find((x) => x.key === key);
   const scorer = r.toMakers ? action.makers : 1 - action.makers;
   const score = state.score.slice();
   score[scorer] += r.pts;
   const stats = structuredClone(state.stats || { euchres: [0, 0], loners: [0, 0], marches: [0, 0] });
-  if (action.result === "euchred") stats.euchres[scorer] += 1;
-  if (action.result === "loner") stats.loners[action.makers] += 1;
-  if (action.result === "march") stats.marches[action.makers] += 1;
+  if (key === "euchred") stats.euchres[scorer] += 1;
+  if (key === "loner") stats.loners[action.makers] += 1;
+  if (key === "march") stats.marches[action.makers] += 1;
   const next = { ...state, score, hands: state.hands + 1, stats };
-  const alone = action.alone ? " alone" : "";
+  const alone = action.alone && key !== "loner" ? " alone" : "";
   const line = `${state.teams[action.makers]}${alone} ${r.toMakers ? r.label.toLowerCase() : "euchred"}, ${state.teams[scorer]} +${r.pts} (${score[0]}–${score[1]})`;
   return { state: next, line };
 }
